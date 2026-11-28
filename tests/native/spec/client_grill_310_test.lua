@@ -1,5 +1,6 @@
 
 local GameCfg = require("common.game_cfg")
+local ZoneMarkers = require("common.zone_markers")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local GrillView = require("client.views.grill_view")
@@ -42,16 +43,20 @@ local function child(root, name)
 end
 
 describe("客户端烧烤视图宿主入口（#310）", function()
-  local saved_vector, saved_color
+  local saved_vector, saved_color, saved_ready, saved_positions
 
   before_each(function()
     saved_vector = rawget(_G, "Vector2")
     saved_color = rawget(_G, "Color")
+    saved_ready, saved_positions = ZoneMarkers.ready, ZoneMarkers.anchor_positions
     _G.Vector2 = { New = function(x, y) return { x = x, y = y } end }
     _G.Color = { New = function(...) return { ... } end }
+    ZoneMarkers.ready = true
+    ZoneMarkers.anchor_positions = { [GameCfg.Grill.Points[1].AnchorName] = { x = 10, y = 0, z = 10 } }
   end)
 
   after_each(function()
+    ZoneMarkers.ready, ZoneMarkers.anchor_positions = saved_ready, saved_positions
     _G.Vector2 = saved_vector
     _G.Color = saved_color
   end)
@@ -110,7 +115,7 @@ describe("客户端烧烤视图宿主入口（#310）", function()
     local store, writer = ClientStore.new({ initial_now = 1000 })
     local root, _, sent, notices = mount(store, {
       anchors = {
-        { index = 1, name = "Z1_Grill", position = { x = 10, y = 0, z = 10 } },
+        { index = 1, name = GameCfg.Grill.Points[1].AnchorName, position = { x = 10, y = 0, z = 10 } },
       },
     })
     writer:update_spatial({ x = 50, y = 0, z = 50 }, {})

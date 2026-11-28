@@ -1,4 +1,5 @@
 local GameCfg = require("common.game_cfg")
+local ZoneMarkers = require("common.zone_markers")
 local ClientStore = require("client.store.client_store")
 local RootView = require("client.views.root_view")
 local FishermanView = require("client.views.fisherman_view")
@@ -8,12 +9,21 @@ local function model(scale) return { Scale = { x = scale, y = scale, z = scale }
 local function base(scale) return { x = scale, y = scale, z = scale } end
 
 describe("钓鱼佬模型按区脉冲", function()
-  local old_vector
+  local old_vector, saved_ready, saved_positions
   before_each(function()
     old_vector = rawget(_G, "Vector3")
+    saved_ready, saved_positions = ZoneMarkers.ready, ZoneMarkers.anchor_positions
     _G.Vector3 = { New = function(x, y, z) return { x = x, y = y, z = z } end }
+    ZoneMarkers.ready = true
+    ZoneMarkers.anchor_positions = {}
+    for index, npc in ipairs(GameCfg.Interact.Fishermen) do
+      ZoneMarkers.anchor_positions[npc.AnchorNames[1]] = { x = index * 20, y = 0, z = 0 }
+    end
   end)
-  after_each(function() _G.Vector3 = old_vector end)
+  after_each(function()
+    ZoneMarkers.ready, ZoneMarkers.anchor_positions = saved_ready, saved_positions
+    _G.Vector3 = old_vector
+  end)
 
   local function mount(models)
     local store, writer = ClientStore.new({ initial_now = 1000 })
@@ -22,7 +32,7 @@ describe("钓鱼佬模型按区脉冲", function()
     for index, npc in ipairs(GameCfg.Interact.Fishermen) do
       anchors[#anchors + 1] = {
         npc = npc, name = npc.AnchorNames[1], index = index,
-        position = { x = 0, y = 0, z = 0 },
+        position = { x = index * 20, y = 0, z = 0 },
       }
     end
     local root = Eui.node({ Name = "UIRoot" })
@@ -41,8 +51,8 @@ describe("钓鱼佬模型按区脉冲", function()
         })
       end,
     })
-    writer:update_spatial({ x = 0, y = 0, z = 0 }, {})
     local function feed(index)
+      writer:update_spatial({ x = index * 20, y = 0, z = 0 }, {})
       local name = GameCfg.Interact.Fishermen[index].AnchorNames[1]
       local button = root:FindFirstChild("BtnFishermanFeed" .. index .. "_" .. name, true)
       assert.is_true(Eui.click(button))

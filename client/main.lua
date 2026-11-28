@@ -175,9 +175,11 @@ Task:Spawn(function()
                     local eui = get_eui_manager()
                     local position = anchor and anchor.Position
                     if not eui or not position then return nil end
-                    local lift = offset and offset.y or 0
+                    local ox = offset and (offset.x or offset.X) or 0
+                    local oy = offset and (offset.y or offset.Y) or 0
+                    local oz = offset and (offset.z or offset.Z) or 0
                     return eui:CreateSceneUIByPrefabKeyAtPosition(
-                        preset, Vector3.New(position.x, position.y + lift, position.z))
+                        preset, Vector3.New(position.x + ox, position.y + oy, position.z + oz))
                 end,
                 hud_entry_rect = function(name)
                     local resolution = read_device_resolution()

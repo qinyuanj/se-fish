@@ -119,8 +119,15 @@ function M.validate_and_build(raw, cfg)
         if type(item.name) ~= 'string' or item.name == '' then
             error('导出器发现空名标记', 0)
         end
+        if item.name:find("['\"\\\r\n]") then
+            error('导出器发现非法标记名字符: ' .. item.name, 0)
+        end
         global_counts[item.name] = (global_counts[item.name] or 0) + 1
         local zidx = zone_index_by_name[item.zone]
+        local water_znum = tonumber(item.name:match('^Z(%d+)_Water%d*$'))
+        if water_znum and water_znum ~= zidx then
+            error('水域标记不在所属区: ' .. tostring(item.zone) .. '/' .. item.name, 0)
+        end
         if zidx then
             local zr = zones_raw[zidx]
             zr.by_name[item.name] = item
@@ -313,8 +320,6 @@ local function editor_cli_path()
 end
 
 -- 生成符合 ADR-0035 四条硬边界的只读编辑态采集脚本
-
--- 生成符合 ADR-0035 四条硬边界的只读编辑态采集脚本
 local function build_editor_probe_lua(tag)
     return string.format([=[
 local TAG = %q
@@ -340,12 +345,12 @@ local function safe_parent(u)
   return ok and p or nil
 end
 local function vec3_xyz(v)
-  if not v then return 0, 0, 0 end
+  if not v then return nil end
   local ok, x, y, z = pcall(function() return v.X, v.Y, v.Z end)
-  if ok and x ~= nil then return x, y, z end
+  if ok and type(x) == "number" and type(y) == "number" and type(z) == "number" then return x, y, z end
   local ok2, a, b, c = pcall(function() return v[1], v[2], v[3] end)
-  if ok2 and a ~= nil then return a, b, c end
-  return 0, 0, 0
+  if ok2 and type(a) == "number" and type(b) == "number" and type(c) == "number" then return a, b, c end
+  return nil
 end
 local function find_zone_name(u)
   local cur = u
@@ -367,18 +372,26 @@ for _, f in ipairs(World:GetUnitsByUnitType("Folder") or {}) do
   end
 end
 
-local function emit_unit(u)
+local function emit_unit(u, unit_kind)
   local n = safe_name(u)
   if n:match("^Z%%d+_") then
     local zn = find_zone_name(u)
+    if unit_kind == "TriggerUnit" then
+      print(string.format("%%s SCENE_EXPORT_ERROR|%%s|发现已退役的TriggerUnit回流: %%s", TAG, zn, n))
+      return
+    end
     local px, py, pz = vec3_xyz(safe_prop(u, "Position"))
     local sx, sy, sz = vec3_xyz(safe_prop(u, "Size"))
+    if px == nil or sx == nil then
+      print(string.format("%%s SCENE_EXPORT_ERROR|%%s|属性Position/Size读取失败: %%s", TAG, zn, n))
+      return
+    end
     print(string.format("%%s SCENE_EXPORT_ITEM|%%s|%%s|%%.4f|%%.4f|%%.4f|%%.4f|%%.4f|%%.4f",
       TAG, zn, n, px, py, pz, sx, sy, sz))
   end
 end
-for _, u in ipairs(World:GetUnitsByUnitType("WorldUnit") or {}) do emit_unit(u) end
-for _, u in ipairs(World:GetUnitsByUnitType("TriggerUnit") or {}) do emit_unit(u) end
+for _, u in ipairs(World:GetUnitsByUnitType("WorldUnit") or {}) do emit_unit(u, "WorldUnit") end
+for _, u in ipairs(World:GetUnitsByUnitType("TriggerUnit") or {}) do emit_unit(u, "TriggerUnit") end
 print(TAG .. " SCENE_EXPORT_DONE")
 ]=], tag)
 end
@@ -408,6 +421,10 @@ function M.fetch_from_editor()
     for line in out2:gmatch('[^\r\n]+') do
         if line:sub(1, 1) == '>' then
             local cleaned = line:gsub('"%s*$', '')
+            local err_msg = cleaned:match('SCENE_EXPORT_ERROR|(.+)$')
+            if err_msg then
+                error('编辑态采集阻断: ' .. err_msg, 0)
+            end
             if cleaned:find('SCENE_EXPORT_DONE', 1, true) then
                 saw_done = true
             end

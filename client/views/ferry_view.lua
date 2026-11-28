@@ -180,7 +180,7 @@ function FerryView.legs_spec()
           local center = anchor_of(leg.point.AnchorName)
           local radius = BodyScale.interaction_radius(character, leg.point.Radius)
           if near(position, center, radius)
-              and InteractPromptArbiter.is_exclusive(position, character, leg.point.AnchorName, center) then
+              and InteractPromptArbiter.is_exclusive(position, character, leg.point.AnchorName) then
             list[#list + 1] = { key = "ferry:" .. index .. ":" .. leg.action,
               route_id = route.Id, action = leg.action, text = leg.text,
               point = leg.point, center = center }

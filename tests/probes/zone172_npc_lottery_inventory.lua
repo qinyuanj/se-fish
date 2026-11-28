@@ -3,7 +3,7 @@
 local MARK = 'NLI172'
 local world = editor:GetService('World')
 local ZONES = { '01 鱼塘', '02 虾池', '03 蟹湖', '04 树林岛', '05 沙滩岛', '06 礁石岛', '07 火山岛' }
-local PATTERN = { 'Fisherman', 'Lottery', 'Z1_Fisherman', '抽奖', '咸鱼', '老虎机', '扭蛋' }
+local PATTERN = { 'Fisherman', 'Lottery', '抽奖', '咸鱼', '老虎机', '扭蛋' }
 local PROPS = { 'UnitType', 'PrefabId', 'PresetId', 'AssetId', 'ModelId', 'RenderMeshId', 'Visible', 'CanCollide' }
 
 local function c(v, i, k, u) return v[k] or v[u] or v[i] end

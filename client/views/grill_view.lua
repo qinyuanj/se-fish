@@ -309,7 +309,7 @@ function GrillView.bubble_spec(options)
         local dist_sq = ViewUtil.distance_sq_xz(position, entry.position)
         local aname = entry.name or (entry.point and entry.point.AnchorName) or ("Grill_" .. tostring(index))
         if dist_sq ~= nil and dist_sq <= radius_sq
-            and InteractPromptArbiter.is_exclusive(position, character, aname, entry.position) then
+            and InteractPromptArbiter.is_exclusive(position, character, aname) then
           list[#list + 1] = {
             index = entry.index or index,
             name = aname,

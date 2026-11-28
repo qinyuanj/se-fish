@@ -11,6 +11,7 @@ local ZoneMarkers = require('common.zone_markers')
 local GameCfg = require('common.game_cfg')
 local SceneGeometry = require('common.cfg.scene_geometry')
 local SceneWaterGeometry = require('common.cfg.scene_water_geometry')
+local LuaSourceStrip = require('tests.support.lua_source_strip')
 
 local function read_source(path)
     local handle = assert(io.open(path, 'rb'))
@@ -115,16 +116,17 @@ describe('scene_static_baseline (#411)', function()
     it('test_interaction_points_resolve_from_anchor_snapshot_only', function()
         local InteractionPoints = require('server.world_host.interaction_points')
         local saved = ZoneMarkers.anchor_positions
-        InteractionPoints.anchors = {}
-        ZoneMarkers.anchor_positions = { Z1_Shop = { x = 12, y = 3, z = 4 } }
-        local anchor = InteractionPoints:find_anchor('Z1_Shop')
-        assert.is_not_nil(anchor)
-        assert.same('Z1_Shop', anchor.Name)
-        assert.same(12, anchor.Position.x)
-        assert.same(4, anchor.Position.z)
-        assert.is_nil(InteractionPoints:find_anchor('TGUnitShop'))
+        local ok, err = pcall(function()
+            ZoneMarkers.anchor_positions = { Z1_Shop = { x = 12, y = 3, z = 4 } }
+            local anchor = InteractionPoints:find_anchor('Z1_Shop')
+            assert.is_not_nil(anchor)
+            assert.same('Z1_Shop', anchor.Name)
+            assert.same(12, anchor.Position.x)
+            assert.same(4, anchor.Position.z)
+            assert.is_nil(InteractionPoints:find_anchor('TGUnitShop'))
+        end)
         ZoneMarkers.anchor_positions = saved
-        InteractionPoints.anchors = {}
+        assert.is_true(ok, tostring(err))
 
         -- 7 个钓鱼佬外观与锚点分离：模型名齐全、锚点来自导出表（模型保持非静态，见 #407）。
         assert.same(7, #GameCfg.Interact.Fishermen)
@@ -135,22 +137,27 @@ describe('scene_static_baseline (#411)', function()
     end)
 
     it('test_runtime_anchor_consumers_do_not_search_scene_units', function()
-        local server_interaction = read_source('server/world_host/interaction_points.lua')
-        assert.is_nil(server_interaction:find('FindFirstChild', 1, true),
-            '交互点不得再按名查场景单位（静态化后查不到）')
+        for _, path in ipairs({
+            'server/world_host/interaction_points.lua',
+            'server/world_host/grill_rules.lua',
+        }) do
+            local code = LuaSourceStrip.strip_comments_and_strings(read_source(path))
+            assert.is_nil(code:match('FindFirstChild%s*%('),
+                '交互判定不得再按名查场景单位（静态化后查不到）: ' .. path)
+        end
 
-        local server_grill = read_source('server/world_host/grill_rules.lua')
-        assert.is_nil(server_grill:find('FindFirstChild', 1, true),
-            '烧烤锚点不得再按名查场景单位（静态化后查不到）')
-
-        local client_main = read_source('client/main.lua')
-        assert.is_not_nil(client_main:find('ZoneMarkers.anchor_position', 1, true))
-        assert.is_nil(client_main:find('wait_for_child(World, stand.AnchorName)', 1, true),
-            '商店气泡位置必须读导出坐标')
-        assert.is_nil(client_main:find('wait_for_child(World, point.AnchorName)', 1, true),
-            '烧烤气泡位置必须读导出坐标')
-        assert.is_nil(client_main:find('FindFirstChild(entry.name', 1, true),
-            '气泡根节点不得再挂到场景单位上')
+        -- client/main.lua 白名单：只允许对非静态钓鱼佬外观（npc.ModelName）调用 1 次 wait_for_child，
+        -- 严禁对任何交互锚点调用 wait_for_child 或 FindFirstChild。
+        local client_code = LuaSourceStrip.strip_comments_and_strings(read_source('client/main.lua'))
+        assert.is_not_nil(client_code:match('ZoneMarkers%.anchor_position%s*%('))
+        local wait_calls = {}
+        for args in client_code:gmatch('wait_for_child%s*%(([^%)]*)%)') do
+            wait_calls[#wait_calls + 1] = args:gsub('%s+', ' ')
+        end
+        assert.same({ 'World, npc.ModelName' }, wait_calls,
+            'client/main.lua 仅允许查找非静态钓鱼佬外观 npc.ModelName')
+        assert.is_nil(client_code:match('FindFirstChild%s*%('),
+            'client/main.lua 不得再调用 FindFirstChild 挂载交互气泡')
 
         -- 全部 5 类客户端交互视图均接入跨设施互斥仲裁器（#410）。
         for _, view_path in ipairs({
@@ -160,8 +167,8 @@ describe('scene_static_baseline (#411)', function()
             'client/views/ferry_view.lua',
             'client/views/lottery_interaction.lua',
         }) do
-            local view_src = read_source(view_path)
-            assert.is_not_nil(view_src:find('InteractPromptArbiter.is_exclusive', 1, true),
+            local view_code = LuaSourceStrip.strip_comments_and_strings(read_source(view_path))
+            assert.is_not_nil(view_code:match('InteractPromptArbiter%.is_exclusive%s*%('),
                 '交互视图缺少跨设施互斥校验: ' .. view_path)
         end
     end)
@@ -187,7 +194,6 @@ describe('scene_static_baseline (#411)', function()
                     end
                     for pos in src:gmatch('()FerryReturn') do
                         local prev = pos > 1 and src:sub(pos - 1, pos - 1) or ''
-                        local before = src:sub(math.max(1, pos - 20), pos - 1)
                         local after = src:sub(pos, math.min(#src, pos + 40))
                         -- 排除 Z2_FerryReturn..Z7_FerryReturn 及 zone_markers 契约角色声明 'FerryReturn', route.Return
                         if prev ~= '_' and not (full == 'common/zone_markers.lua' and after:find("FerryReturn', route.Return", 1, true)) then

@@ -37,7 +37,6 @@ function GrillBehavior.new_env(tree, opts)
     player = player,
     state = "idle",
     anchors = {},
-    world = opts.world,
     create_unit = opts.create_unit,
   }
   return {

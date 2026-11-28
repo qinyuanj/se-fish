@@ -3,6 +3,7 @@
 -- 强制每一处运行期动态单位创建都登记在下方台账中；新增未授权建点或超额立即阻断，
 -- 已移除的旧建点若台账未同步收窄也会提示收紧。
 local seam = require('tools.seam')
+local LuaSourceStrip = require('tests.support.lua_source_strip')
 
 -- 台账：相对路径 -> { count = 真实 CreateUnit 调用次数, reason = 用途说明 }
 local LEDGER = {
@@ -27,58 +28,14 @@ local function read_source(path)
     return text
 end
 
--- 剥离注释与字符串字面量，仅保留真实代码语句中的 CreateUnit 调用，避免注释/日志字符串误报。
-local function strip_comments_and_strings(src)
-    local out, i, n = {}, 1, #src
-    while i <= n do
-        local ch, nxt = src:sub(i, i), src:sub(i + 1, i + 1)
-        if ch == '-' and nxt == '-' then
-            local eqs = src:match('^%[(=*)%[', i + 2)
-            if eqs then
-                local close_pos = src:find(']' .. eqs .. ']', i + 4 + #eqs, true)
-                i = close_pos and (close_pos + 2 + #eqs) or (n + 1)
-            else
-                local nl = src:find('\n', i + 2, true)
-                i = nl and (nl + 1) or (n + 1)
-            end
-        elseif ch == "'" or ch == '"' then
-            local quote = ch
-            i = i + 1
-            while i <= n do
-                local c = src:sub(i, i)
-                if c == '\\' then
-                    i = i + 2
-                elseif c == quote then
-                    i = i + 1
-                    break
-                else
-                    i = i + 1
-                end
-            end
-            out[#out + 1] = ' '
-        elseif ch == '[' and (nxt == '[' or nxt == '=') then
-            local eqs = src:match('^%[(=*)%[', i)
-            if eqs then
-                local close_pos = src:find(']' .. eqs .. ']', i + 2 + #eqs, true)
-                i = close_pos and (close_pos + 2 + #eqs) or (n + 1)
-                out[#out + 1] = ' '
-            else
-                out[#out + 1] = ch
-                i = i + 1
-            end
-        else
-            out[#out + 1] = ch
-            i = i + 1
-        end
-    end
-    return table.concat(out)
-end
-
--- 统计真实引擎建点调用：:CreateUnit( 或 pcall(xxx.CreateUnit,
+-- 统计真实引擎建点调用：:CreateUnit(、.CreateUnit( 或 pcall/xpcall(xxx.CreateUnit,
 local function count_create_unit_calls(code)
     local count = 0
     for _ in code:gmatch(':CreateUnit%s*%(') do count = count + 1 end
-    for _ in code:gmatch('pcall%s*%(%s*[%w_%.]+%.CreateUnit%s*,') do count = count + 1 end
+    for receiver in code:gmatch('([%w_]+)%.CreateUnit%s*%(') do
+        if receiver ~= 'self' and receiver ~= 'opts' then count = count + 1 end
+    end
+    for _ in code:gmatch('x?pcall%s*%(%s*[%w_%.]+%.CreateUnit%s*,') do count = count + 1 end
     return count
 end
 
@@ -89,7 +46,7 @@ describe('runtime_unit_ledger_guard (#411)', function()
             for _, rel_path in ipairs(seam.list_files(root)) do
                 local rel = seam.normalize(root .. '/' .. rel_path)
                 if rel:match('%.lua$') and not rel:find('/packages/', 1, true) then
-                    local stripped = strip_comments_and_strings(read_source(rel))
+                    local stripped = LuaSourceStrip.strip_comments_and_strings(read_source(rel))
                     local calls = count_create_unit_calls(stripped)
                     if calls > 0 then observed[rel] = calls end
                 end

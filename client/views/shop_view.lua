@@ -55,7 +55,7 @@ function ShopView.bubble_spec(options)
       for _, entry in ipairs(options.anchors or {}) do
         local aname = entry.name or (entry.stand and entry.stand.AnchorName)
         if entry.stand and near(position, entry.position, character)
-            and InteractPromptArbiter.is_exclusive(position, character, aname, entry.position) then
+            and InteractPromptArbiter.is_exclusive(position, character, aname) then
           list[#list + 1] = entry
         end
       end

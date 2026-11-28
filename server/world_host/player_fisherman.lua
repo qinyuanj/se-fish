@@ -95,17 +95,51 @@ local function deliver(target, exchange, product)
   return true
 end
 
+local cached_fisherman_world = nil
+local cached_fisherman_models = {}
+
+--- 查找并按当前 World 缓存非静态钓鱼佬外观单位，避免每次喂食全树遍历。
+local function resolve_fisherman_model(world, model_name)
+  if cached_fisherman_world ~= world then
+    cached_fisherman_world = world
+    cached_fisherman_models = {}
+  end
+  local cached = cached_fisherman_models[model_name] ---@cast cached any
+  if cached ~= nil then
+    local ok_d, destroyed = pcall(function() return cached.Destroyed end)
+    if ok_d and not destroyed then return cached end
+    cached_fisherman_models[model_name] = nil
+  end
+  local ok_find, unit = pcall(world.FindFirstChild, world, model_name, true)
+  if not ok_find then
+    print("[PlayerFisherman] 查找钓鱼佬模型失败", model_name, tostring(unit))
+    return nil
+  end
+  if unit ~= nil then cached_fisherman_models[model_name] = unit end
+  return unit
+end
+
 --- 吃动作播放：只在非静态的钓鱼佬外观上播放（#407 / #410）。
 --- 锚点标记已开启静态优化，游戏内不再创建完整 Unit，不能拿锚点当动画宿主；
 --- 仅日志兜底，不读 mount 的 upvalue（拆分前 mount 体内的 play_eat）。
 local function play_eat(point)
   if not point.EatAnimation or not point.ModelName then return end
-  local ok_world, world = pcall(function() return game:GetService("World") end)
-  if not ok_world or not world or type(world.FindFirstChild) ~= "function" then return end
-  local unit = world:FindFirstChild(point.ModelName, true) ---@cast unit any
+  local ok_world, world = pcall(function() return game and game:GetService("World") or nil end)
+  if not ok_world then
+    print("[PlayerFisherman] 获取 World 服务失败", point.ModelName, tostring(world))
+    return
+  end
+  if not world or type(world.FindFirstChild) ~= "function" then return end
+  local unit = resolve_fisherman_model(world, point.ModelName)
   if not unit then return end
-  local ok, err = pcall(unit.PlayAnimation, unit, point.EatAnimation)
-  if not ok then print("[PlayerFisherman] 吃动作播放失败", tostring(err)) end
+  local ok_read, play = pcall(function() return unit.PlayAnimation end)
+  if not ok_read then
+    print("[PlayerFisherman] 读取 PlayAnimation 失败", point.ModelName, tostring(play))
+    return
+  end
+  if type(play) ~= "function" then return end
+  local ok, err = pcall(play, unit, point.EatAnimation)
+  if not ok then print("[PlayerFisherman] 吃动作播放失败", point.ModelName, tostring(err)) end
 end
 
 -- ===== 渔夫交互：拆分前 PlayerFisherman.mount 体内的闭包 =====

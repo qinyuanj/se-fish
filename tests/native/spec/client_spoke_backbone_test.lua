@@ -622,7 +622,7 @@ describe("客户端 Spoke 主干契约（#296）", function()
       local fired = {}
       local anchor_unit
       local scene_nodes, preset_calls = {}, {}
-      local preset_fails, eui_ready = false, true
+      local eui_ready = true
       local zones = {
         fishPond = { Boundary = { MinX = -50, MaxX = 50, MinZ = -50, MaxZ = 50 } },
       }
@@ -662,7 +662,6 @@ describe("客户端 Spoke 主干契约（#296）", function()
           end,
           create_scene_node = function(_, preset, anchor, offset)
             preset_calls[#preset_calls + 1] = { preset = preset, anchor = anchor, offset = offset }
-            if preset_fails then error("preset-unavailable") end
             return Eui.node({ Name = "ShopBubblePreset", Position = offset })
           end,
         }
