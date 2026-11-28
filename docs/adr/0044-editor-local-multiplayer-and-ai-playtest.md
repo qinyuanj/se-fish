@@ -1,8 +1,8 @@
 # 0044 编辑器原生支持本地多客户端试玩与试玩内 AI 角色切换
 
-**Status**: accepted（2026-11-28；取代 [ADR-0040](0040-local-multiplayer-not-simulatable-in-editor.md)）
+**Status**: accepted（2026-11-28；取代原 ADR-0040）
 
-[ADR-0040](0040-local-multiplayer-not-simulatable-in-editor.md) 此前依据 `editor-cli 0.20.17` 帮助、编辑态 API 和公开手册，认定本地编辑器无法模拟多人，同时在「未查」一节留出「编辑器二级下拉菜单」。2026-11-28 经编辑器界面实证，SE 编辑器原生提供两项本地多人试玩能力，推翻 ADR-0040 关于「本地完全无法模拟多人、多人功能必须外部第二账号入房」的前提。
+原 ADR-0040 曾依据 `editor-cli 0.20.17` 帮助、编辑态 API 和公开手册，认定本地编辑器无法模拟多人，同时在「未查」一节留出「编辑器二级下拉菜单」。2026-11-28 经编辑器界面实证，SE 编辑器原生提供两项本地多人试玩能力，推翻原 ADR-0040 关于「本地完全无法模拟多人、多人功能必须外部第二账号入房」的前提。
 
 ## 能力事实（2026-11-28 实证）
 
@@ -28,6 +28,6 @@
 
 ## 后果
 
-- [ADR-0040](0040-local-multiplayer-not-simulatable-in-editor.md) 状态改为 `superseded by ADR-0044`。
+- 原 ADR-0040 作废移除，本地多人能力边界以本条为准。
 - 下游工具链与验收文档（`docs/agents/editor-cli.md`、`.agents/skills/verify-se-fish/`、`docs/acceptance/production-switches.md`）按本 ADR 与首轮探针结果分步更新。
 - 本地多客户端启动当前仍需经编辑器 UI 点击一次 **本地多人测试 → 开始**；`editor-cli` 后续版本若开放对应参数，再补自动化启动路径。

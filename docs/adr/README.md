@@ -25,10 +25,9 @@
 - [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：`editor-unit` 首选只读，批量采集与写操作走 `exec` 三条硬边界。
 - [0036](0036-platform-commerce-and-ads-not-verifiable-in-editor.md) — 改动商城、支付或广告适配层：编辑器内不可验收、订单身份自研与超时兜底。
 - [0038](0038-emmylua-agentic-coding-quality-gate.md) — 改动 Lua 诊断门禁、`.emmyrc.json` 或基线：EmmyLua 作为诊断质量门禁与单向基线。
-- [0040](0040-local-multiplayer-not-simulatable-in-editor.md) — （已被 0044 取代）早期仅查 CLI 与公开文档得出的「本地模拟多人不可用」历史结论。
-- [0044](0044-editor-local-multiplayer-and-ai-playtest.md) — 评估或设计本地多人试玩与多端验收：编辑器原生支持本地多客户端窗口试玩与试玩内调试插件 AI 切换，`editor-cli 0.20.20` 尚无对应启动参数。
 - [0041](0041-token-budget-gate.md) — 新增或调整单文件体积规则、基线或 pre-commit/CI 门禁：token 预算（`se-fish-budget-v1`）、出货集与受管集、棘轮基线。
 - [0042](0042-no-plugin-dev-data-export-only-exception.md) — 判断开发是否依赖 VS Code Eggitor 插件、或如何改 `data/`：默认无插件开发，`data/` 导出是唯一插件例外。
+- [0044](0044-editor-local-multiplayer-and-ai-playtest.md) — 评估或设计本地多人试玩与多端验收：编辑器原生支持本地多客户端窗口试玩与试玩内调试插件 AI 切换，`editor-cli 0.20.20` 尚无对应启动参数。
 
 ## 美术资产
 - [0004](0004-fish-asset-scale.md) — 制作、导出或验收鱼类模型与动画：单位方块基准、100 倍导入换算、底面中心原点与贴图编码。
