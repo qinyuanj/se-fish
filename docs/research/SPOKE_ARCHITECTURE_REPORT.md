@@ -26,7 +26,7 @@ python -c "import os, glob; [print(d, len(fs), sum(len(open(p, encoding='utf-8',
 | L5 配置内容 | `common.cfg` | 鱼、物品、商店、抽奖、盲盒及占位资产数据 |
 | L6 包 | `client.packages`、`server.packages`、`common.packages` | 整包交付的官方包与自研包；包不得反向依赖包外业务 |
 
-三端 `packages` 同属 L6，但不进入生成架构图和质量度量；它们仍受分层与循环依赖门禁约束，范围依据 [ADR-0021](../../docs/adr/0021-packages-outside-business-scope.md)。`common.util` 含引擎等待、通知与 `REUtil` 依赖，因此归 L3；`common.game_cfg` 含配置解析和玩法计算，因此归 L4。
+三端 `packages` 同属 L6，复核基线时按原 ADR-0021 排除出生成架构图和质量度量（现已由 [ADR-0043](../../docs/adr/0043-packages-inside-business-scope.md) 重新纳入），并始终受分层与循环依赖门禁约束。`common.util` 含引擎等待、通知与 `REUtil` 依赖，因此归 L3；`common.game_cfg` 含配置解析和玩法计算，因此归 L4。
 
 ## 运行时 Spoke 树拓扑
 

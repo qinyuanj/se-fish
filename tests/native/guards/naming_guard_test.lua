@@ -1,5 +1,5 @@
--- 命名门禁：三端自写代码的文件名与目录名一律 snake_case（ADR-0034 第一层）；
--- 模块表与类型名的绑定必须是 PascalCase（ADR-0037）。
+-- 命名门禁：三端自写代码的文件名与目录名一律 snake_case（ADR-0034 L1）；
+-- 模块表与类型名的绑定必须是 PascalCase（ADR-0034 L2，合并原 ADR-0037）。
 -- 失败方式先列：
 --   1. 新文件沿用 PascalCase / camelCase → 规范再次分叉，L2、L3 的改名成本要重来一遍；
 --   2. 目录名带大写 → require 与文件名大小写精确匹配，本机不区分大小写能跑，换宿主就炸；
@@ -66,7 +66,7 @@ describe("命名门禁", function()
   end)
 end)
 
--- 第二层（ADR-0037）：文件名是 snake_case，但模块表与类型名必须是 PascalCase。
+-- 第二层（ADR-0034 L2）：文件名是 snake_case，但模块表与类型名必须是 PascalCase。
 -- 失败方式先列：把 local X = require(...) 的 X 写成 snake_case，会让「类型」与「值」同形，
 -- 读代码时分不出 client_store 是模块表还是数字，口径迟早漂回全 snake。
 local PASCAL = "^[A-Z][A-Za-z0-9]*$"
@@ -115,14 +115,14 @@ describe("模块表命名", function()
   end)
 end)
 
--- 第三层（ADR-0034 的 L3、ADR-0037 的口径）：方法名与自研配置段名必须是 snake_case。
+-- 第三层（ADR-0034 L3）：方法名与自研配置段名必须是 snake_case。
 -- 失败方式先列：
 --   1. 新写 function PlayerData:Serialize() → 与已改完的 player_data:serialize 并存两套方法名，L3 剩下的方法要付第二遍改名成本；
 --   2. 新写 GameCfg.SomeSection = { ... } → 与已改完的 GameCfg.some_section 并存，读代码分不清哪个还有效；
 --   3. 把守卫写成「存量必须为零」→ L3 还在迁移中，全仓常红后必然被静音（ADR-0034「门禁先开会让全仓常红」的教训）。
 -- 所以存量冻结在 data/legacy_pascal_names_baseline.txt：基线之外的新名字一律失败，基线内的等 L3 搬完再删行。
 -- 扫描面只有两处：函数定义的名字尾段、GameCfg 的段名。官方契约五类豁免见 ADR-0034「官方契约原样」，
--- 包内接口实现的方法名跟随接口（ADR-0037），所以 Attach 这类由 INTERFACE_METHODS 点名放行。
+-- 包内接口实现的方法名跟随接口（ADR-0034），所以 Attach 这类由 INTERFACE_METHODS 点名放行。
 local BASELINE = "tests/native/guards/data/legacy_pascal_names_baseline.txt"
 local INTERFACE_METHODS = { Attach = true }
 
@@ -205,7 +205,7 @@ describe("方法与配置段命名", function()
     end
     if #bad > 0 then
       table.sort(bad)
-      assert.same({}, bad, "新写的 PascalCase 方法名或 GameCfg 段名（ADR-0034 L3 / ADR-0037）：\n" .. table.concat(bad, "\n"))
+      assert.same({}, bad, "新写的 PascalCase 方法名或 GameCfg 段名（ADR-0034 L3）：\n" .. table.concat(bad, "\n"))
     end
   end)
 end)

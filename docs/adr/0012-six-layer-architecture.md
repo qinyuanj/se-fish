@@ -23,4 +23,4 @@
 
 - 新独立根模块必须显式归类；已有命名空间的后代继承归属。
 - 静态依赖方向与架构图可自动复核，入口注入和 RemoteEvent 仍需行为测试约束。
-- 官方包位于最底层，包内部环豁免；质量工具与架构图的范围口径见 [ADR-0021](0021-packages-outside-business-scope.md)。
+- 官方包位于最底层，包内部环豁免；质量工具与架构图的范围口径见 [ADR-0043](0043-packages-inside-business-scope.md)。

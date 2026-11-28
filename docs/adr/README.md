@@ -4,7 +4,6 @@
 
 ## 架构、代码与生命周期
 - [0012](0012-six-layer-architecture.md) — 新增模块、调整目录职责或依赖方向：六层架构与依赖门禁。
-- [0021](0021-packages-outside-business-scope.md) — （已被 0043 取代）三端 `packages/` 退出业务范围的历史决策与当时理由。
 - [0043](0043-packages-inside-business-scope.md) — 调整质量工具或架构图范围：三端 `packages/` 纳入业务范围，包内模块直接建类并参与质量度量。
 - [0022](0022-introduce-spoke-runtime.md) — 引用或同步 `spoke` / `spoke_eggy`：纯拷贝落位、同源同 SHA、不就地修改、单向依赖与 `is_alive` 边界。
 - [0032](0032-spoke-native-lifecycle-architecture.md) — 改动服务端/客户端生命周期、Spoke 树、单位创建回收或官方包接入：三类树拓扑、双层 Phase、离场三步、跨树协作与单位所有权规则。
@@ -22,7 +21,6 @@
 - [0039](0039-acceptance-surface-as-feature-files.md) — 登记条款、补证据或改验收门禁：唯一验收面、两列条款与状态反推。
 
 ## 工具链与平台边界
-- [0009](0009-blender-headless-only.md) — （已废弃，工作流存于 tag `art-workflow-archive-v1`）驱动 Blender 处理美术资产：只走无头，唯一入口 `lua tools/cli.lua blender`。
 - [0017](0017-windows-native-only.md) — 改动 `tools/` CLI、子进程、路径或测试夹具：Windows 原生单一环境与唯一接缝 `tools/seam.lua`。
 - [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：`editor-unit` 在 0.20.17 恢复为首选读取面、`exec` 合同降为兜底；故障与四条硬边界作历史保留。
 - [0036](0036-platform-commerce-and-ads-not-verifiable-in-editor.md) — 改动商城、支付或广告适配层：编辑器内不可验收、订单身份自研与超时兜底。
@@ -35,3 +33,5 @@
 ## 美术资产
 - [0004](0004-fish-asset-scale.md) — 制作、导出或验收鱼类模型与动画：单位方块基准、100 倍导入换算、底面中心原点与贴图编码。
 - [0006](0006-structural-asset-reuse.md) — 规划物种资产与动画复用：按身体结构复用骨架与动作，根位移由程序驱动。
+
+已移除的 Blender 无头链路与美术创作工作流（含原 ADR-0009）封存于 git tag `art-workflow-archive-v1`。
