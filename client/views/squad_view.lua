@@ -234,10 +234,9 @@ function SquadView.member_spec()
         name = "PartyHealthBar" .. uid,
         parent = row,
         rect = Layout.from_top_left(ROW_H, 12, 32, BAR_W, BAR_H),
-        image = Tokens.ASSET.ROUND_RECT,
+        image = Tokens.ASSET.BAR_BG,
         color = Tokens.COLOR.HUD_BAR_BG,
-        opacity = Tokens.OPACITY.HUD_SURFACE,
-        stretch = Tokens.vec4(8, 8, 8, 8),
+        opacity = Tokens.OPACITY.SOLID,
         z_order = 1,
       })
 

@@ -38,8 +38,8 @@ local function is_background_node(node)
 end
 
 local function has_single_source_button_label(node)
-  -- ShopRow 为多子标签商品卡片（icon_only），由 ShopRowName/Price/State 构成，不走单标签约定
-  if tostring(node.Name or ""):match("^ShopRow%d+$") then
+  -- ShopRow 为多子标签商品卡片（icon_only），由 ShopRowName/Price/State 构成；官方独立图标关闭键 10011 无文字
+  if tostring(node.Name or ""):match("^ShopRow%d+$") or node.NormalImage == "official://image/10011" then
     return true
   end
   for _, child_node in pairs(node.children) do

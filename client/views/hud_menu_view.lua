@@ -153,15 +153,14 @@ function HudMenuView.mount(s, ctx, options)
       name = "MenuDrawerPanel",
       parent = ctx.root_node,
       rect = drawer_rect,
-      image = Tokens.ASSET.ROUND_RECT,
-      color = Tokens.COLOR.HUD_CAPSULE,
-      opacity = 0.96,
-      stretch = Tokens.vec4(24, 24, 24, 24),
+      image = Tokens.ASSET.MODAL_COMPACT,
+      color = Tokens.COLOR.MODAL_BG,
+      opacity = Tokens.OPACITY.SOLID,
       z_order = Tokens.Z.HUD_POPUP_BG,
       touch = true,
       swallow = true,
     })
-    Primitives.tween_fade_in(drawer, 0.96, Tokens.ANIM.FAST)
+    Primitives.tween_fade_in(drawer, Tokens.OPACITY.SOLID, Tokens.ANIM.FAST)
 
     for index, item in ipairs(items) do
       local item_rect = item_rects[index]

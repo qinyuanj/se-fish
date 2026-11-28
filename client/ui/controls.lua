@@ -1,6 +1,6 @@
--- 统一 UI 复合交互控件（归属 L3 client.ui）：
--- 与 client/ui/primitives.lua 同层，封装按钮（单源居中子 LabelButtonText、零双字重影）、
--- 标准模态弹窗壳（14588 半透遮罩 + 浅白底板 + 标题 + 关闭键）与水平胶囊进度条。
+-- 统一 UI 复合交互控件（归属 L3 client.ui，方案 A 蛋仔原生质感风）：
+-- 封装官方双态按钮（零 ButtonText 双字重影）、官方立体弹窗框架（31003 / 16347 + 10011 图标关闭键 + 15014 装饰线）
+-- 与官方血条/进度条原语（30008 底槽 + 30007 填充 + 可选左侧图标）。
 
 local Tokens = require("client.ui.tokens")
 local Layout = require("client.ui.layout")
@@ -11,13 +11,14 @@ local Controls = {}
 local BUTTON_LABEL_NAME = "LabelButtonText"
 Controls.BUTTON_LABEL_NAME = BUTTON_LABEL_NAME
 
--- 按钮外观变体表：统一 3A 蛋仔金蓝体系（弹窗浅白底 + 金主/蓝辅，HUD 深海蓝半透）
+-- 方案 A 按钮外观变体表：全部采用官方质感双态贴图，彻底弃用素面 11081
 local BUTTON_VARIANTS = {
   gold = {
     image = Tokens.ASSET.BTN_GOLD,
-    use_stretch = true,
+    press_image = Tokens.ASSET.BTN_GOLD,
+    disable_image = Tokens.ASSET.BTN_MOD_DISABLED,
     normal = Tokens.COLOR.WHITE,
-    press = { 236, 224, 200, 255 },
+    press = Tokens.COLOR.GOLD_PRESS,
     disabled = Tokens.COLOR.DISABLED,
     text_color = Tokens.COLOR.WHITE,
     outline = true,
@@ -26,30 +27,9 @@ local BUTTON_VARIANTS = {
   },
   blue = {
     image = Tokens.ASSET.BTN_BLUE,
-    use_stretch = true,
+    press_image = Tokens.ASSET.BTN_BLUE,
+    disable_image = Tokens.ASSET.BTN_MOD_DISABLED,
     normal = Tokens.COLOR.WHITE,
-    press = { 220, 232, 248, 255 },
-    disabled = Tokens.COLOR.DISABLED,
-    text_color = Tokens.COLOR.WHITE,
-    outline = true,
-    outline_color = Tokens.COLOR.OUTLINE_BLUE,
-    bold = true,
-  },
-  primary = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
-    normal = Tokens.COLOR.GOLD,
-    press = Tokens.COLOR.GOLD_PRESS,
-    disabled = Tokens.COLOR.DISABLED,
-    text_color = Tokens.COLOR.WHITE,
-    outline = true,
-    outline_color = Tokens.COLOR.OUTLINE_GOLD,
-    bold = true,
-  },
-  secondary = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
-    normal = Tokens.COLOR.BLUE,
     press = Tokens.COLOR.BLUE_PRESS,
     disabled = Tokens.COLOR.DISABLED,
     text_color = Tokens.COLOR.WHITE,
@@ -57,22 +37,55 @@ local BUTTON_VARIANTS = {
     outline_color = Tokens.COLOR.OUTLINE_BLUE,
     bold = true,
   },
-  selected = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
-    normal = Tokens.COLOR.SELECTED,
-    press = Tokens.COLOR.SELECTED_PRESS,
-    disabled = Tokens.COLOR.DISABLED,
+  primary = {
+    image = Tokens.ASSET.BTN_SM_GOLD,
+    press_image = Tokens.ASSET.BTN_SM_GOLD_PRESS,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    large_image = Tokens.ASSET.BTN_MOD_GOLD,
+    large_press_image = Tokens.ASSET.BTN_MOD_GOLD_PRESS,
+    large_disable_image = Tokens.ASSET.BTN_MOD_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.WHITE,
     text_color = Tokens.COLOR.WHITE,
     outline = true,
-    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    outline_color = Tokens.COLOR.OUTLINE_GOLD,
+    bold = true,
+  },
+  secondary = {
+    image = Tokens.ASSET.BTN_SM_BLUE,
+    press_image = Tokens.ASSET.BTN_SM_BLUE_PRESS,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    large_image = Tokens.ASSET.BTN_MOD_BLUE,
+    large_press_image = Tokens.ASSET.BTN_MOD_BLUE_PRESS,
+    large_disable_image = Tokens.ASSET.BTN_MOD_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.WHITE,
+    text_color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_BLUE,
+    bold = true,
+  },
+  selected = {
+    image = Tokens.ASSET.BTN_PILL_GOLD,
+    press_image = Tokens.ASSET.BTN_PILL_GOLD_PRESS,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.WHITE,
+    text_color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_GOLD,
     bold = true,
   },
   danger = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
-    normal = Tokens.COLOR.DANGER,
-    press = Tokens.COLOR.DANGER_PRESS,
+    image = Tokens.ASSET.CARD_RED,
+    press_image = Tokens.ASSET.CARD_RED,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    stretch = { 24, 24, 24, 24 },
+    normal = Tokens.COLOR.WHITE,
+    press = { 220, 196, 196, 255 },
     disabled = Tokens.COLOR.DISABLED,
     text_color = Tokens.COLOR.WHITE,
     outline = true,
@@ -80,8 +93,10 @@ local BUTTON_VARIANTS = {
     bold = true,
   },
   surface = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
+    image = Tokens.ASSET.CARD_GRAY,
+    press_image = Tokens.ASSET.CARD_WHITE,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    stretch = { 24, 24, 24, 24 },
     normal = Tokens.COLOR.SURFACE_BTN,
     press = Tokens.COLOR.SURFACE_BTN_PRESS,
     disabled = Tokens.COLOR.DISABLED,
@@ -90,8 +105,10 @@ local BUTTON_VARIANTS = {
     bold = false,
   },
   card = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
+    image = Tokens.ASSET.CARD_WHITE,
+    press_image = Tokens.ASSET.CARD_ORANGE,
+    disable_image = Tokens.ASSET.CARD_GRAY,
+    stretch = { 24, 24, 24, 24 },
     normal = Tokens.COLOR.MODAL_CARD,
     press = Tokens.COLOR.MODAL_CARD_ACTIVE,
     disabled = Tokens.COLOR.DISABLED,
@@ -100,22 +117,60 @@ local BUTTON_VARIANTS = {
     bold = false,
   },
   hud = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
-    normal = Tokens.COLOR.HUD_SLOT,
-    press = Tokens.COLOR.HUD_SLOT_PRESS,
+    image = Tokens.ASSET.BTN_PILL_BLUE,
+    press_image = Tokens.ASSET.BTN_PILL_BLUE_PRESS,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
     disabled = Tokens.COLOR.DISABLED,
     text_color = Tokens.COLOR.WHITE,
     outline = true,
-    outline_color = Tokens.COLOR.OUTLINE_DARK,
+    outline_color = Tokens.COLOR.OUTLINE_BLUE,
+    bold = true,
+  },
+  circle_gold = {
+    image = Tokens.ASSET.BTN_CIRCLE_GOLD,
+    press_image = Tokens.ASSET.BTN_CIRCLE_GOLD_PRESS,
+    disable_image = Tokens.ASSET.BTN_CIRCLE_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.WHITE,
+    text_color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_GOLD,
+    bold = true,
+  },
+  circle_blue = {
+    image = Tokens.ASSET.BTN_CIRCLE_BLUE,
+    press_image = Tokens.ASSET.BTN_CIRCLE_BLUE_PRESS,
+    disable_image = Tokens.ASSET.BTN_CIRCLE_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.WHITE,
+    text_color = Tokens.COLOR.WHITE,
+    outline = true,
+    outline_color = Tokens.COLOR.OUTLINE_BLUE,
+    bold = true,
+  },
+  close = {
+    image = Tokens.ASSET.BTN_CLOSE,
+    press_image = Tokens.ASSET.BTN_CLOSE_PRESS,
+    disable_image = Tokens.ASSET.BTN_CLOSE,
+    icon_only = true,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.DISABLED,
+    text_color = Tokens.COLOR.WHITE,
+    outline = false,
     bold = true,
   },
   disabled = {
-    image = Tokens.ASSET.ROUND_RECT,
-    use_stretch = true,
-    normal = Tokens.COLOR.DISABLED,
-    press = Tokens.COLOR.DISABLED,
-    disabled = Tokens.COLOR.DISABLED,
+    image = Tokens.ASSET.BTN_SM_DISABLED,
+    press_image = Tokens.ASSET.BTN_SM_DISABLED,
+    disable_image = Tokens.ASSET.BTN_SM_DISABLED,
+    normal = Tokens.COLOR.WHITE,
+    press = Tokens.COLOR.WHITE,
+    disabled = Tokens.COLOR.WHITE,
     text_color = Tokens.COLOR.WHITE,
     outline = false,
     bold = false,
@@ -136,6 +191,15 @@ local function find_button_label(button)
   return ok and sub or nil
 end
 
+local function resolve_images(style, w, h)
+  local is_large = (type(w) == "number" and w >= 220) and (type(h) == "number" and h >= 60)
+  if is_large and style.large_image ~= nil then
+    return style.large_image, style.large_press_image or style.large_image,
+      style.large_disable_image or style.disable_image or style.large_image
+  end
+  return style.image, style.press_image or style.image, style.disable_image or style.image
+end
+
 --- 套用按钮外观变体（支持运行期切换选中态/禁用态/主辅态）。
 ---@param button any
 ---@param variant_name string
@@ -144,14 +208,19 @@ function Controls.set_button_style(button, variant_name)
     return
   end
   local style = BUTTON_VARIANTS[variant_name] or BUTTON_VARIANTS.secondary
-  button.NormalImage = style.image
-  button.PressImage = style.image
-  button.DisableImage = style.image
+  local ok_sz, sz = pcall(function() return button.Size end)
+  local w = ok_sz and type(sz) == "table" and (sz.x or sz.X) or nil
+  local h = ok_sz and type(sz) == "table" and (sz.y or sz.Y) or nil
+  local img_n, img_p, img_d = resolve_images(style, w, h)
+  button.NormalImage = img_n
+  button.PressImage = img_p
+  button.DisableImage = img_d
   button.ButtonNormalColor = Tokens.color(style.normal)
   button.ButtonPressColor = Tokens.color(style.press)
   button.ButtonDisableColor = Tokens.color(style.disabled)
-  if style.use_stretch then
-    safe_write(button, "StretchArea", Tokens.vec4(24, 24, 24, 24))
+  if style.stretch ~= nil then
+    local st = style.stretch
+    safe_write(button, "StretchArea", Tokens.vec4(st[1], st[2], st[3], st[4]))
   end
   local sub = find_button_label(button)
   if sub ~= nil then
@@ -203,21 +272,22 @@ end
 --- 规范化按钮（强制 ButtonText="" + 单源居中子 EUITextLabel，杜绝双字重叠）。
 ---@param scope table
 ---@param ctx table
----@param opts table { name, parent?, rect, text?, variant?, font_size?, bold?, text_color?, outline?, z_order?, visible?, touch?, on_click?, label_name? }
+---@param opts table { name, parent?, rect, text?, variant?, font_size?, bold?, text_color?, outline?, z_order?, visible?, touch?, on_click?, label_name?, icon_only? }
 ---@return any, any
 function Controls.button(scope, ctx, opts)
   local r = opts.rect
   local variant_name = opts.variant or "secondary"
   local style = BUTTON_VARIANTS[variant_name] or BUTTON_VARIANTS.secondary
+  local img_n, img_p, img_d = resolve_images(style, r.w, r.h)
   local btn = ctx.create_node(scope, "EUIButton", {
     Name = opts.name,
     Parent = opts.parent or ctx.root_node,
     Position = Tokens.vec2(r.x, r.y),
     Size = Tokens.vec2(r.w, r.h),
     ButtonText = "",
-    NormalImage = style.image,
-    PressImage = style.image,
-    DisableImage = style.image,
+    NormalImage = img_n,
+    PressImage = img_p,
+    DisableImage = img_d,
     Visible = opts.visible ~= false,
     TouchEnabled = opts.touch ~= false,
     SwallowTouchEnabled = true,
@@ -227,18 +297,19 @@ function Controls.button(scope, ctx, opts)
   btn.TouchEnabled = opts.touch ~= false
   btn.SwallowTouchEnabled = true
   btn.LocalZOrder = opts.z_order or 0
-  btn.NormalImage = style.image
-  btn.PressImage = style.image
-  btn.DisableImage = style.image
+  btn.NormalImage = img_n
+  btn.PressImage = img_p
+  btn.DisableImage = img_d
   btn.ButtonNormalColor = Tokens.color(style.normal)
   btn.ButtonPressColor = Tokens.color(style.press)
   btn.ButtonDisableColor = Tokens.color(style.disabled)
-  if style.use_stretch then
-    safe_write(btn, "StretchArea", Tokens.vec4(24, 24, 24, 24))
+  if style.stretch ~= nil then
+    local st = style.stretch
+    safe_write(btn, "StretchArea", Tokens.vec4(st[1], st[2], st[3], st[4]))
   end
 
   local sub_label = nil
-  if opts.icon_only ~= true then
+  if opts.icon_only ~= true and style.icon_only ~= true then
     local pad_x = r.w >= 48 and 8 or 4
     local pad_y = r.h >= 32 and 4 or 0
     local sub_rect = Layout.rect(r.w / 2, r.h / 2, math.max(4, r.w - pad_x * 2), math.max(4, r.h - pad_y * 2))
@@ -265,7 +336,7 @@ function Controls.button(scope, ctx, opts)
   return btn, sub_label
 end
 
---- 标准模态弹窗壳（14588 半透遮罩 + 单层扁平奶白底板 + 标题 + 不撞字的右上关闭按钮 + 0.2s override 淡入）。
+--- 标准模态弹窗壳（方案 A：14588 半透遮罩 + 官方立体弹窗 31003/16347 + 标题 + 15014 装饰线 + 10011 图标关闭键）。
 ---@param scope table
 ---@param ctx table
 ---@param opts table { name, title, width?, height?, close_name?, title_name?, on_close?, backdrop_dismiss?, theme?, z_mask?, z_panel? }
@@ -288,34 +359,32 @@ function Controls.modal_shell(scope, ctx, opts)
   })
 
   local is_dark = opts.theme == "dark"
+  local frame_img = panel_h <= 440 and Tokens.ASSET.MODAL_SMALL or Tokens.ASSET.MODAL_MEDIUM
   local panel = Primitives.image(scope, ctx, {
     name = opts.name,
     parent = ctx.root_node,
     rect = Layout.center_in(res.x, res.y, panel_w, panel_h),
-    image = Tokens.ASSET.ROUND_RECT,
-    color = is_dark and Tokens.COLOR.HUD_CAPSULE or Tokens.COLOR.MODAL_BG,
-    opacity = is_dark and 0.94 or Tokens.OPACITY.SOLID,
-    stretch = Tokens.vec4(32, 32, 32, 32),
+    image = frame_img,
+    color = is_dark and { 44, 56, 76, 255 } or Tokens.COLOR.MODAL_BG,
+    opacity = is_dark and 0.96 or Tokens.OPACITY.SOLID,
     z_order = z_panel,
     touch = true,
     swallow = true,
   })
   if opts.animate ~= false then
-    Primitives.tween_fade_in(panel, is_dark and 0.94 or Tokens.OPACITY.SOLID, Tokens.ANIM.NORMAL)
+    Primitives.tween_fade_in(panel, is_dark and 0.96 or Tokens.OPACITY.SOLID, Tokens.ANIM.NORMAL)
   end
 
-  local close_w, close_h = 96, 48
+  local close_w, close_h = 64, 52
   local close_btn = nil
   if opts.show_close ~= false then
-    local close_rect = Layout.from_top_right(panel_w, panel_h, pad, 20, close_w, close_h)
+    local close_rect = Layout.from_top_right(panel_w, panel_h, pad, 16, close_w, close_h)
     close_btn = Controls.button(scope, ctx, {
       name = opts.close_name or "btn_close",
       parent = panel,
       rect = close_rect,
-      text = "关闭",
-      variant = "blue",
-      font_size = Tokens.FONT_SIZE.BODY,
-      z_order = 2,
+      variant = "close",
+      z_order = 3,
       on_click = opts.on_close,
     })
   end
@@ -335,22 +404,36 @@ function Controls.modal_shell(scope, ctx, opts)
     z_order = 2,
   })
 
+  -- 轻装饰分隔线（位于标题下方 y_top=72..80，严格留出 content_top=84 避免与任何正文重叠）
+  local divider = Primitives.image(scope, ctx, {
+    name = (opts.name or "modal") .. "_divider",
+    parent = panel,
+    rect = Layout.from_top_left(panel_h, pad, 72, panel_w - pad * 2, 8),
+    image = Tokens.ASSET.DECOR_LINE,
+    color = Tokens.COLOR.MODAL_DIVIDER,
+    opacity = 0.72,
+    z_order = 1,
+    touch = false,
+    swallow = false,
+  })
+
   return {
     backdrop = backdrop,
     panel = panel,
     title_label = title_label,
     close_button = close_btn,
+    divider = divider,
     width = panel_w,
     height = panel_h,
     pad = pad,
-    content_top = 20 + 48 + Tokens.SPACE.LG,
+    content_top = 84,
   }
 end
 
---- 水平胶囊进度条（底槽 + 填充 + 居中白字轻描边，零嵌套多余外框）。
+--- 官方质感进度条（30008 原生立体底槽 + 30007 高光填充 + 可选左侧图标 + 居中白字轻描边，无多余 11081 外框）。
 ---@param scope table
 ---@param ctx table
----@param opts table { name, parent?, rect, fill_color?, bg_color?, percent?, text?, font_size?, z_order?, visible?, opacity? }
+---@param opts table { name, parent?, rect, fill_color?, bg_color?, percent?, text?, font_size?, z_order?, visible?, opacity?, icon? }
 ---@return table
 function Controls.progress_bar(scope, ctx, opts)
   local r = opts.rect
@@ -358,10 +441,9 @@ function Controls.progress_bar(scope, ctx, opts)
     name = opts.name .. "_bg",
     parent = opts.parent,
     rect = r,
-    image = Tokens.ASSET.ROUND_RECT,
+    image = opts.bg_image or Tokens.ASSET.BAR_BG,
     color = opts.bg_color or Tokens.COLOR.HUD_BAR_BG,
-    opacity = opts.opacity or Tokens.OPACITY.HUD_SURFACE,
-    stretch = Tokens.vec4(12, 12, 12, 12),
+    opacity = opts.opacity or Tokens.OPACITY.SOLID,
     z_order = opts.z_order or Tokens.Z.HUD_BG,
     visible = opts.visible,
   })
@@ -372,7 +454,7 @@ function Controls.progress_bar(scope, ctx, opts)
     Parent = bg,
     Position = Tokens.vec2(r.w / 2, r.h / 2),
     Size = Tokens.vec2(fill_w, fill_h),
-    Image = Tokens.ASSET.BAR_FILL,
+    Image = opts.fill_image or Tokens.ASSET.BAR_FILL,
     Direction = 0,
     Percent = opts.percent or 100,
     Visible = true,
@@ -381,10 +463,29 @@ function Controls.progress_bar(scope, ctx, opts)
   fill.Color = Tokens.color(opts.fill_color or Tokens.COLOR.HEALTH)
   fill.TouchEnabled = false
   fill.SwallowTouchEnabled = false
+
+  local icon_node = nil
+  local label_x = r.w / 2
+  local label_w = fill_w
+  if opts.icon ~= nil and opts.icon ~= "" then
+    local icon_s = Layout.snap4(math.min(r.h - 8, 28), 20)
+    icon_node = Primitives.image(scope, ctx, {
+      name = opts.name .. "_icon",
+      parent = bg,
+      rect = Layout.rect(8 + icon_s / 2, r.h / 2, icon_s, icon_s),
+      image = opts.icon,
+      color = Tokens.COLOR.WHITE,
+      z_order = 2,
+    })
+    local offset = 8 + icon_s + 4
+    label_w = math.max(4, r.w - offset - 8)
+    label_x = offset + label_w / 2
+  end
+
   local lbl = Primitives.label(scope, ctx, {
     name = opts.name .. "_label",
     parent = bg,
-    rect = Layout.rect(r.w / 2, r.h / 2, fill_w, fill_h),
+    rect = Layout.rect(label_x, r.h / 2, label_w, fill_h),
     text = opts.text or "",
     font_size = opts.font_size or Tokens.FONT_SIZE.CAPTION,
     bold = true,
@@ -396,6 +497,7 @@ function Controls.progress_bar(scope, ctx, opts)
   return {
     bg = bg,
     fill = fill,
+    icon = icon_node,
     label = lbl,
     set_percent = function(pct)
       fill.Percent = math.max(0, math.min(100, tonumber(pct) or 0))

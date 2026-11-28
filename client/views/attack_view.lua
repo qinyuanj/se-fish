@@ -175,7 +175,7 @@ function AttackBehavior.mount_control(self, ps)
     parent = control,
     rect = local_rect,
     text = "攻击",
-    variant = "hud",
+    variant = "circle_gold",
     font_size = Tokens.FONT_SIZE.SUBTITLE,
     bold = true,
     outline = true,

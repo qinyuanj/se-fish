@@ -48,11 +48,11 @@ function MainHudVitalsView.mount(s, ctx, options)
   local rects = layout.rects
   local cfg = GameCfg.Vitals
 
-  -- 1. 横向胶囊状态条：血量条 + 饥饿条（深海蓝半透明底 + 红/橙进度条 + 居中白字轻描边）
+  -- 1. 官方质感血量条 + 饥饿条（30008 立体底槽 + 30007 填充 + 左侧爱心/食物图标 + 居中白字轻描边）
   local bars = {}
   local bar_specs = {
-    { key = "Health", name = "HealthBar", rect = rects.HealthBar, rgba = Tokens.COLOR.HEALTH },
-    { key = "Hunger", name = "HungerBar", rect = rects.HungerBar, rgba = Tokens.COLOR.HUNGER },
+    { key = "Health", name = "HealthBar", rect = rects.HealthBar, rgba = Tokens.COLOR.HEALTH, icon = Tokens.ASSET.ICON_HEART },
+    { key = "Hunger", name = "HungerBar", rect = rects.HungerBar, rgba = Tokens.COLOR.HUNGER, icon = Tokens.ASSET.ICON_FOOD },
   }
   for _, spec in ipairs(bar_specs) do
     local bar = Controls.progress_bar(s, ctx, {
@@ -60,11 +60,12 @@ function MainHudVitalsView.mount(s, ctx, options)
       parent = ctx.root_node,
       rect = spec.rect,
       fill_color = spec.rgba,
-      bg_color = Tokens.COLOR.HUD_CAPSULE,
-      opacity = Tokens.OPACITY.HUD_CAPSULE,
+      bg_color = Tokens.COLOR.HUD_BAR_BG,
+      opacity = Tokens.OPACITY.SOLID,
+      icon = spec.icon,
       percent = 100,
       text = "",
-      font_size = Tokens.FONT_SIZE.CAPTION,
+      font_size = Tokens.FONT_SIZE.MICRO,
       z_order = Tokens.Z.HUD_BG,
     })
     bar.fill.Color = make_color(spec.rgba)
@@ -137,6 +138,9 @@ function MainHudVitalsView.mount(s, ctx, options)
       entry.bg.Visible = visible
       entry.fill.Visible = visible
       entry.label.Visible = visible
+      if entry.icon ~= nil then
+        entry.icon.Visible = visible
+      end
     end
     if not visible then
       for _, edge in ipairs(flash_edges) do

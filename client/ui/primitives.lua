@@ -4,13 +4,24 @@
 --   2. 模态半透明遮罩统一用 EUIImage + official://image/14588 + 显式 Opacity（绝不靠 Color.a）；
 --   3. 所有 EUITextLabel 只写 TextColor（绝不写 Color），统一内置圆体 Font，显式禁用 ShadowEnabled，
 --      纯展示节点强制 TouchEnabled = false, SwallowTouchEnabled = false；
---   4. 面板开关与过渡统一 0.16~0.24s + override = true（在无 Tween 的离线测试环境安全跳过）。
--- 复合交互控件（按钮 / 模态弹窗壳 / 进度条）位于同层 client/ui/controls.lua。
+--   4. 面板开关与过渡统一 0.16~0.24s + override = true（在无 Tween 的离线测试环境安全跳过）；
+--   5. 方案 A 蛋仔原生质感：根据长宽比自动匹配官方立体底框、品质底板与深蓝造型标签，弃用素面 11081。
 
 local Tokens = require("client.ui.tokens")
 local Layout = require("client.ui.layout")
 
 local Primitives = {}
+
+local DEFAULT_STRETCH = {
+  [Tokens.ASSET.MODAL_MEDIUM] = { 64, 64, 64, 64 },
+  [Tokens.ASSET.MODAL_SMALL] = { 56, 56, 56, 56 },
+  [Tokens.ASSET.MODAL_COMPACT] = { 36, 36, 36, 36 },
+  [Tokens.ASSET.CARD_WHITE] = { 28, 28, 28, 28 },
+  [Tokens.ASSET.CARD_GRAY] = { 28, 28, 28, 28 },
+  [Tokens.ASSET.CARD_ORANGE] = { 28, 28, 28, 28 },
+  [Tokens.ASSET.CARD_RED] = { 28, 28, 28, 28 },
+  [Tokens.ASSET.CARD_SELECTED] = { 24, 24, 24, 24 },
+}
 
 local function safe_write(node, key, value)
   if node == nil or value == nil then
@@ -214,7 +225,7 @@ function Primitives.container(scope, ctx, opts)
   return node
 end
 
---- 静态图片 / 色块表面（默认禁止触控，显式 Opacity）。
+--- 静态图片 / 官方贴图表面（按素材自动匹配安全九宫格，默认禁止触控，显式 Opacity）。
 ---@param scope table
 ---@param ctx table
 ---@param opts table { name, parent?, rect, image?, color?, opacity?, stretch?, z_order?, visible?, touch?, swallow? }
@@ -242,26 +253,31 @@ function Primitives.image(scope, ctx, opts)
   node.LocalZOrder = opts.z_order or 0
   if opts.stretch ~= nil then
     safe_write(node, "StretchArea", opts.stretch)
-  elseif img == Tokens.ASSET.ROUND_RECT or img == Tokens.ASSET.MODAL_SMALL or img == Tokens.ASSET.MODAL_MEDIUM then
-    safe_write(node, "StretchArea", Tokens.vec4(32, 32, 32, 32))
+  else
+    local preset = DEFAULT_STRETCH[img]
+    if preset ~= nil then
+      safe_write(node, "StretchArea", Tokens.vec4(preset[1], preset[2], preset[3], preset[4]))
+    end
   end
   return node
 end
 
---- HUD 深海蓝半透明胶囊底板（贴在 3D 场景上）。
+--- HUD 造型底条 / 卡片托盘（方案 A：横条用 11140 深蓝造型标签，卡片用 31008 蓝卡，弃用素面 11081）。
 ---@param scope table
 ---@param ctx table
----@param opts table { name, parent?, rect, z_order?, opacity?, visible?, color? }
+---@param opts table { name, parent?, rect, image?, z_order?, opacity?, visible?, color? }
 ---@return any
 function Primitives.capsule(scope, ctx, opts)
+  local r = opts.rect
+  local is_wide_strip = (r.h > 0) and ((r.w / r.h) >= 2.2)
+  local default_img = is_wide_strip and Tokens.ASSET.TAG_DARK_BLUE or Tokens.ASSET.CARD_BLUE
   return Primitives.image(scope, ctx, {
     name = opts.name,
     parent = opts.parent,
-    rect = opts.rect,
-    image = Tokens.ASSET.ROUND_RECT,
+    rect = r,
+    image = opts.image or default_img,
     color = opts.color or Tokens.COLOR.HUD_CAPSULE,
     opacity = opts.opacity or Tokens.OPACITY.HUD_CAPSULE,
-    stretch = Tokens.vec4(24, 24, 24, 24),
     z_order = opts.z_order or Tokens.Z.HUD_BG,
     visible = opts.visible,
     touch = false,

@@ -178,8 +178,8 @@ describe("Spoke 主 HUD 1A 左上横向胶囊状态条与金币视图", function
     local env = mount_vitals(1080)
     local first_batch = {}
     for i = 1, #env.created do first_batch[i] = env.created[i] end
-    -- 2*(bg+fill+label) + 3*(CoinCapsule+CoinIcon+CoinLabel) + 4 FlashEdges = 13
-    assert.equals(13, #first_batch)
+    -- 2*(bg+fill+icon+label) + 3*(CoinCapsule+CoinIcon+CoinLabel) + 4 FlashEdges = 15
+    assert.equals(15, #first_batch)
 
     -- 重连重置：旧动态节点全部销毁并干净重建
     env.writer:reset_session("reconnect")

@@ -17,7 +17,7 @@ HudWidgets.BUTTON_COLORS = {
   DISABLED = Tokens.COLOR.DISABLED,
 }
 
-local BUTTON_IMAGE = Tokens.ASSET.ROUND_RECT
+local BUTTON_IMAGE = Tokens.ASSET.SLOT_WOOD_BG
 
 --- 静态展示节点不接收触摸，避免挡住下面的按钮。
 function HudWidgets.passive(node)
@@ -31,7 +31,7 @@ function HudWidgets.place(node, rect)
   Layout.apply(node, rect)
 end
 
---- HUD 按钮（严禁写 ButtonText，图标/文字独立于同级高 ZOrder 标签或居中子标签）。
+--- HUD 按钮（方案 A：默认采用海岛实木物品格 11089，严禁写 ButtonText，文字独立于同级高 ZOrder 标签）。
 ---@param ctx table RootView 上下文
 ---@param scope table EffectBuilder
 ---@param spec table { name, x, y, w, h, parent?, image?, normal?, press?, disabled?, touch?, swallow?, visible?, z_order? }
@@ -60,9 +60,6 @@ function HudWidgets.button(ctx, scope, spec)
   btn.ButtonNormalColor = ViewUtil.color(normal)
   btn.ButtonPressColor = ViewUtil.color(press)
   btn.ButtonDisableColor = ViewUtil.color(disable)
-  if img == BUTTON_IMAGE then
-    pcall(function() btn.StretchArea = Tokens.vec4(24, 24, 24, 24) end) -- 离线测试替身无 StretchArea 时安全跳过
-  end
   if spec.visible ~= nil then
     btn.Visible = spec.visible
   end

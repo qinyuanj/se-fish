@@ -18,9 +18,9 @@ local DRAG_THRESHOLD_PX = 10
 local PANEL_PAD = Tokens.SPACE.PANEL_PAD
 local HEADER_TOP = 20
 local HEADER_H = 48
-local CLOSE_W, CLOSE_H = 96, 48
+local CLOSE_W, CLOSE_H = 64, 52
 local GRID_ORIGIN_LEFT = 36
-local GRID_ORIGIN_TOP = 84
+local GRID_ORIGIN_TOP = 88
 local SLOT_COLUMNS = 8
 local SLOT_W, SLOT_H = 92, 88
 local SLOT_GAP_X, SLOT_GAP_Y = 8, 8
@@ -35,9 +35,9 @@ local COLORS = {
   PRESS = Tokens.COLOR.HUD_SLOT_PRESS,
   SELECTED = Tokens.COLOR.SELECTED,
   DISABLED = Tokens.COLOR.DISABLED,
-  SLOT_NORMAL = Tokens.COLOR.MODAL_SURFACE,
-  SLOT_ITEM = Tokens.COLOR.MODAL_CARD,
-  SLOT_PRESS = Tokens.COLOR.MODAL_CARD_ACTIVE,
+  SLOT_NORMAL = Tokens.COLOR.HUD_SLOT_EMPTY,
+  SLOT_ITEM = Tokens.COLOR.HUD_SLOT,
+  SLOT_PRESS = Tokens.COLOR.HUD_SLOT_PRESS,
   PANEL_BG = Tokens.COLOR.MODAL_BG,
 }
 MainHudBackpackPanel.COLORS = COLORS
@@ -147,10 +147,9 @@ function PanelBehavior.create_nodes(self)
     name = "BackpackPanel",
     parent = ctx.root_node,
     rect = panel_rect,
-    image = Tokens.ASSET.ROUND_RECT,
+    image = Tokens.ASSET.MODAL_MEDIUM,
     color = COLORS.PANEL_BG,
     opacity = Tokens.OPACITY.SOLID,
-    stretch = Tokens.vec4(32, 32, 32, 32),
     z_order = Tokens.Z.BACKPACK_PANEL,
     touch = true,
     swallow = true,
@@ -178,11 +177,8 @@ function PanelBehavior.create_nodes(self)
     name = "BtnBackpackClose",
     parent = ctx.root_node,
     rect = close_r,
-    text = "关闭",
-    variant = "blue",
-    font_size = Tokens.FONT_SIZE.BODY,
+    variant = "close",
     z_order = Tokens.Z.BACKPACK_CONTENT,
-    label_name = "LabelBackpackClose",
     on_click = function()
       view:set_backpack_open(false)
     end,

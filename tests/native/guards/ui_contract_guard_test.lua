@@ -83,6 +83,9 @@ local function scan_static_violations(dirs)
         if bt ~= nil then
           violations[#violations + 1] = string.format("%s:%d 写了非空 ButtonText=%q（会导致双字重影）", path, line_no, bt)
         end
+        if code:find("official://image/11081", 1, true) or code:find("ASSET%.ROUND_RECT") then
+          violations[#violations + 1] = string.format("%s:%d 禁止使用素面 11081 圆角矩形，请用蛋仔官方质感框架/按钮/物品格", path, line_no)
+        end
       end
     end
   end

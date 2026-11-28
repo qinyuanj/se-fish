@@ -153,7 +153,7 @@ function ShopPanelNodes.create_nodes(self, shop_text)
     name = "ImageShopDetailIcon",
     parent = self.detail_panel,
     rect = Layout.from_top_left(BODY_H, 20, 20, 64, 64),
-    image = Tokens.ASSET.ROUND_RECT,
+    image = Tokens.ASSET.SLOT_WOOD_BG,
     visible = false,
     z_order = 2,
   })
@@ -205,16 +205,15 @@ function ShopPanelNodes.create_row(self, es, row, index, is_selected)
     name = "ShopRowBackground" .. index,
     parent = button,
     rect = Layout.center_in(ROW_W, ROW_H, ROW_W, ROW_H),
-    image = Tokens.ASSET.ROUND_RECT,
-    color = is_selected and Tokens.COLOR.MODAL_CARD_ACTIVE or Tokens.COLOR.MODAL_CARD,
-    stretch = Tokens.vec4(12, 12, 12, 12),
+    image = is_selected and Tokens.ASSET.CARD_ORANGE or Tokens.ASSET.CARD_WHITE,
+    color = Tokens.COLOR.WHITE,
     z_order = 0,
   })
   local icon = Primitives.image(es, ctx, {
     name = "ShopRowIcon" .. index,
     parent = button,
     rect = Layout.from_top_left(ROW_H, 4, 4, 28, 28),
-    image = (row.icon ~= nil and row.icon ~= "") and row.icon or Tokens.ASSET.ROUND_RECT,
+    image = (row.icon ~= nil and row.icon ~= "") and row.icon or Tokens.ASSET.SLOT_WOOD_BG,
     visible = row.icon ~= nil and row.icon ~= "",
     z_order = 1,
   })

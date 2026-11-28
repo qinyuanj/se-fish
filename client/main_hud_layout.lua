@@ -75,7 +75,7 @@ local function clampSlots(n)
 end
 
 -- 1A + 2A + 4px 栅格尺寸表
-local BAR_W, BAR_H = 160, 40
+local BAR_W, BAR_H = 180, 40
 local COIN_ICON, COIN_LABEL_W, COIN_LABEL_H = 40, 120, 40
 local MENU_W, MENU_H = 128, 52
 local MENU_DRAWER_W, MENU_ITEM_H, MENU_ITEM_GAP, MENU_PAD = 224, 48, 8, 16
