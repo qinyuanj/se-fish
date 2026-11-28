@@ -32,14 +32,15 @@ local Trigger = {}
 ---@field private _event_head integer
 ---@field private _event_tail integer
 ---@field private _is_flushing boolean
----@field private _dispatch_list (fun(value: any))[]?
+---@field private _dispatch_list table<integer, (fun(value: any))?>?
+---@field private _unsub_fn (fun(id: any))?
 local methods = Trigger --[[@as table]]
 methods.__index = methods
 
 ---@param name? string
 ---@return Spoke.Trigger<any>
 function Trigger.new(name)
-  local self = setmetatable({
+  return setmetatable({
     name = name,
     _subs = {},
     _dead_count = 0,
@@ -49,8 +50,8 @@ function Trigger.new(name)
     _event_tail = 0,
     _is_flushing = false,
     _dispatch_list = nil,
+    _unsub_fn = nil,
   }, methods)
-  return self
 end
 
 ---@generic T
@@ -87,10 +88,15 @@ function methods:_subscribe(fn)
   local sub = { id = id, fn = fn }
   local subs = self._subs
   subs[#subs + 1] = sub
-  local trigger = self
-  return SpokeHandle.of(id, function()
-    trigger:_unsub_by_id(id)
-  end)
+  local unsub_fn = self._unsub_fn
+  if unsub_fn == nil then
+    local trigger = self
+    unsub_fn = function(sub_id)
+      trigger:_unsub_by_id(sub_id)
+    end
+    self._unsub_fn = unsub_fn
+  end
+  return SpokeHandle.of(id, unsub_fn)
 end
 
 function methods:subscribe(fn)
@@ -102,7 +108,7 @@ function methods:_unsub_by_id(id)
   local subs = self._subs
   local lo, hi = 1, #subs
   while lo <= hi do
-    local mid = math.floor((lo + hi) / 2)
+    local mid = (lo + hi) // 2
     local sub = subs[mid]
     ---@cast sub -nil
     if sub.id < id then
@@ -122,15 +128,16 @@ end
 
 ---@param fn fun(value: any)
 function methods:_unsub_by_fn(fn)
-  local ids = {}
-  for _, sub in ipairs(self._subs) do
+  local subs = self._subs
+  local dead = self._dead_count
+  for index = 1, #subs do
+    local sub = subs[index]
     if sub.fn == fn then
-      ids[#ids + 1] = sub.id
+      sub.fn = nil
+      dead = dead + 1
     end
   end
-  for _, id in ipairs(ids) do
-    self:_unsub_by_id(id)
-  end
+  self._dead_count = dead
 end
 
 function methods:unsubscribe(fn)
@@ -140,26 +147,10 @@ function methods:unsubscribe(fn)
   self:_unsub_by_fn(fn)
 end
 
----@return (fun(value: any))[]
-function methods:_reset_dispatch_list()
-  local list = self._dispatch_list
-  if list == nil then
-    list = {}
-    self._dispatch_list = list
-    return list
-  end
-  for index = 1, #list do
-    list[index] = nil
-  end
-  return list
-end
-
 ---@param fn fun(value: any)
 ---@param payload any
 local function invoke_subscriber(fn, payload)
-  local ok, err = pcall(function()
-    fn(payload)
-  end)
+  local ok, err = pcall(fn, payload)
   if not ok then
     SpokeError.log("Trigger subscriber error", err)
   end
@@ -167,15 +158,40 @@ end
 
 ---@param payload any
 function methods:_dispatch(payload)
-  local dispatch_list = self:_reset_dispatch_list()
-  for _, sub in ipairs(self._subs) do
-    if sub.fn ~= nil then
-      dispatch_list[#dispatch_list + 1] = sub.fn
+  local dispatch_list = self._dispatch_list
+  if dispatch_list == nil then
+    dispatch_list = {}
+    self._dispatch_list = dispatch_list
+  end
+  local subs = self._subs
+  local count = 0
+  for index = 1, #subs do
+    local fn = subs[index].fn
+    if fn ~= nil then
+      count = count + 1
+      dispatch_list[count] = fn
     end
   end
-  for _, fn in ipairs(dispatch_list) do
-    invoke_subscriber(fn, payload)
+  for index = 1, count do
+    local fn = dispatch_list[index]
+    dispatch_list[index] = nil
+    if fn ~= nil then
+      invoke_subscriber(fn, payload)
+    end
   end
+end
+
+function methods:_drain()
+  local events = self._events
+  while self._event_head <= self._event_tail do
+    local head = self._event_head
+    local payload = events[head]
+    events[head] = nil
+    self._event_head = head + 1
+    self:_dispatch(payload)
+  end
+  self._event_head = 1
+  self._event_tail = 0
 end
 
 function methods:_flush()
@@ -183,14 +199,7 @@ function methods:_flush()
     return
   end
   self._is_flushing = true
-  local ok, err = pcall(function()
-    while self._event_head <= self._event_tail do
-      local payload = self._events[self._event_head]
-      self._events[self._event_head] = nil
-      self._event_head = self._event_head + 1
-      self:_dispatch(payload)
-    end
-  end)
+  local ok, err = pcall(methods._drain, self)
   self._is_flushing = false
   self._subs, self._dead_count = compact(self._subs, self._dead_count)
   if not ok then
@@ -199,12 +208,10 @@ function methods:_flush()
 end
 
 function methods:invoke(payload)
-  local events = self._events
-  self._event_tail = self._event_tail + 1
-  events[self._event_tail] = payload
-  SpokeRuntime.batch(function()
-    self:_flush()
-  end)
+  local tail = self._event_tail + 1
+  self._event_tail = tail
+  self._events[tail] = payload
+  SpokeRuntime.batch(methods._flush, self)
 end
 
 return Trigger

@@ -1,3 +1,10 @@
+local ult = math.ult or function(a, b)
+  if (a ~ b) < 0 then
+    return a >= 0
+  end
+  return a < b
+end
+
 ---@class Spoke.Ordering
 local Ordering = {}
 
@@ -18,7 +25,7 @@ function Ordering.compare_unsigned(a, b)
   if a == b then
     return 0
   end
-  return math.ult(a, b) and -1 or 1
+  return ult(a, b) and -1 or 1
 end
 
 ---@param a boolean

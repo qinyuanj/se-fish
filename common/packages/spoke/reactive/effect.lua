@@ -21,6 +21,34 @@ local collect_triggers = Computation._collect_triggers
 ---@field subscribe fun(self: Spoke.Effect<T>, fn: fun(value: T)): Spoke.SpokeHandle
 ---@field unsubscribe fun(self: Spoke.Effect<T>, fn: fun(value: T))
 
+---@class Spoke.EffectImpl: Spoke.Effect<any>
+---@field package _block Spoke.EffectBlock?
+---@field package _output_state Spoke.State<any>?
+---@field package _current_signal Spoke.Signal<any>?
+---@field package _forward_output (fun(value: any))?
+---@field package _deferred_init Spoke.LambdaInitFn?
+
+---@param self Spoke.EffectImpl
+---@return Spoke.State<any>
+local function ensure_output_state(self)
+  local state = self._output_state
+  if state == nil then
+    state = State.new()
+    self._output_state = state
+    self._forward_output = function(value)
+      state:set(value)
+    end
+    local sync_tick = function()
+      local current = self._current_signal
+      state:set(current ~= nil and current:now() or nil)
+    end
+    self._deferred_init = function()
+      return sync_tick
+    end
+  end
+  return state
+end
+
 ---@class Spoke.EffectClass
 local Effect = Computation.extend("Effect", {
   ---@param self Spoke.EffectImpl
@@ -33,8 +61,10 @@ local Effect = Computation.extend("Effect", {
     local triggers = collect_triggers(...)
     Computation.constructor(self, triggers)
     self._block = block
-    self._output_state = State.new()
-    self._was_signal = false
+    self._output_state = nil
+    self._current_signal = nil
+    self._forward_output = nil
+    self._deferred_init = nil
   end,
 
   ---@param self Spoke.EffectImpl
@@ -43,30 +73,21 @@ local Effect = Computation.extend("Effect", {
     if self._block == nil then
       return
     end
-    local builder = EffectBuilder.new(function(signal)
-      self:_add_dynamic_trigger(signal)
-    end, s)
-
+    self._current_signal = nil
+    local builder = EffectBuilder.new(self._add_dynamic_fn, s)
     local result = self._block(builder)
 
-    local result_is_signal = is_signal(result)
-    if result_is_signal then
-      builder:subscribe(result, function(value)
-        self._output_state:set(value)
-      end)
-      builder:call(LambdaEpoch.new("Deferred Initializer", function()
-        return function()
-          self._output_state:set(result:now())
-        end
-      end))
-    elseif self._was_signal then
-      builder:call(LambdaEpoch.new("Deferred Initializer", function()
-        return function()
-          self._output_state:set(nil)
-        end
-      end))
+    if is_signal(result) then
+      ensure_output_state(self)
+      self._current_signal = result
+      builder:subscribe(result, self._forward_output --[[@as fun(value: any)]])
+      builder:call(LambdaEpoch.new("Deferred Initializer", self._deferred_init --[[@as Spoke.LambdaInitFn]]))
+    else
+      local state = self._output_state
+      if state ~= nil and state:now() ~= nil then
+        builder:call(LambdaEpoch.new("Deferred Initializer", self._deferred_init --[[@as Spoke.LambdaInitFn]]))
+      end
     end
-    self._was_signal = self._was_signal or result_is_signal
   end,
 })
 
@@ -83,22 +104,28 @@ function Effect.new(...)
   return raw_new(...)
 end
 
----@class Spoke.EffectImpl: Spoke.Effect<any>
----@field package _block Spoke.EffectBlock?
----@field package _output_state Spoke.State<any>
----@field package _was_signal boolean
-local methods = Effect --[[@as table]]
+local methods = Effect --[[@as Spoke.EffectImpl]]
 
 function methods:now()
-  return self._output_state:now()
+  local state = self._output_state
+  if state == nil then
+    return nil
+  end
+  return state:now()
 end
 
 function methods:subscribe(fn)
-  return self._output_state:subscribe(fn)
+  return ensure_output_state(self):subscribe(fn)
 end
 
 function methods:unsubscribe(fn)
-  self._output_state:unsubscribe(fn)
+  if type(fn) ~= "function" then
+    error("Trigger.unsubscribe expects a function", 2)
+  end
+  local state = self._output_state
+  if state ~= nil then
+    state:unsubscribe(fn)
+  end
 end
 
 return Effect

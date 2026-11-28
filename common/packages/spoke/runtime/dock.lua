@@ -103,10 +103,8 @@ function methods:call(key, epoch)
   assert_key(key)
   assert_unattached_epoch(epoch)
 
-  SpokeRuntime.push({ type = "Dock", epoch = this, phase = "Dock" })
-  local ok, result = xpcall(function()
-    return this:_install(key, epoch --[[@as Spoke.EpochInternal]])
-  end, identity)
+  SpokeRuntime.push({ type = "Dock", epoch = this })
+  local ok, result = xpcall(this._install, identity, this, key, epoch --[[@as Spoke.EpochInternal]])
   SpokeRuntime.pop()
 
   if not ok then
@@ -114,6 +112,9 @@ function methods:call(key, epoch)
   end
   return result
 end
+
+local cached_effect
+local cached_parse_effect_args
 
 ---@generic T
 ---@overload fun(self: Spoke.Dock, key: string, name: string, block: (fun(s: Spoke.EffectBuilder): Spoke.Signal<T>?), ...: Spoke.TriggerList): Spoke.Effect<T>
@@ -124,9 +125,15 @@ end
 ---@return Spoke.Effect<any>
 function methods:effect(a, b, ...)
   assert_key(a)
-  local Effect = require("common.packages.spoke.reactive.effect")
-  local parse_effect_args = require("common.packages.spoke.reactive.computation")._parse_effect_args
-  local name, block, triggers = parse_effect_args(b, ...)
+  local Effect = cached_effect
+  local parse_args = cached_parse_effect_args
+  if Effect == nil or parse_args == nil then
+    Effect = require("common.packages.spoke.reactive.effect")
+    parse_args = require("common.packages.spoke.reactive.computation")._parse_effect_args
+    cached_effect = Effect
+    cached_parse_effect_args = parse_args
+  end
+  local name, block, triggers = parse_args(b, ...)
   if name ~= nil then
     return self:call(a, Effect.new(name, block, triggers))
   end

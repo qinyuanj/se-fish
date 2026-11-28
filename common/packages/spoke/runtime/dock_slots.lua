@@ -46,18 +46,29 @@ function DockSlots.find(dock, key)
 end
 
 ---@param dock Spoke.DockInternal
+---@param size integer
+local function truncate(dock, size)
+  local slots = dock._child_slots
+  for index = #slots, size + 1, -1 do
+    slots[index] = nil
+  end
+end
+
+---@param dock Spoke.DockInternal
 ---@param key string
 function DockSlots.release(dock, key)
   local index = dock._slot_by_key[key]
   if index == nil then
     return
   end
-  dock._child_slots[index + 1] = { key = key, epoch = nil }
+  local slot = dock._child_slots[index + 1]
+  if slot ~= nil then
+    slot.epoch = nil
+  end
   dock._slot_by_key[key] = nil
   dock._live_count = dock._live_count - 1
   if dock._live_count == 0 then
-    dock._child_slots = {}
-    dock._slot_by_key = {}
+    truncate(dock, 0)
   end
 end
 
@@ -69,14 +80,6 @@ local function move_slot(dock, slot, epoch, write_index)
   dock._child_slots[write_index + 1] = slot
   dock._slot_by_key[slot.key] = write_index
   epoch:_reindex(write_index)
-end
-
----@param dock Spoke.DockInternal
----@param size integer
-local function truncate(dock, size)
-  for index = #dock._child_slots, size + 1, -1 do
-    dock._child_slots[index] = nil
-  end
 end
 
 ---@param dock Spoke.DockInternal
@@ -112,14 +115,19 @@ end
 
 ---@param dock Spoke.DockInternal
 function DockSlots.detach_all(dock)
-  for index = #dock._child_slots, 1, -1 do
-    local slot = dock._child_slots[index]
+  local slots = dock._child_slots
+  for index = #slots, 1, -1 do
+    local slot = slots[index]
     local epoch = slot and slot.epoch
     if epoch ~= nil then
       epoch:detach()
     end
+    slots[index] = nil
   end
-  DockSlots.reset(dock)
+  for key in pairs(dock._slot_by_key) do
+    dock._slot_by_key[key] = nil
+  end
+  dock._live_count = 0
 end
 
 return DockSlots

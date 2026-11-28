@@ -1,6 +1,6 @@
 ---@class Spoke.Logger
----@field log fun(self: Spoke.Logger, message: any)
----@field error fun(self: Spoke.Logger, message: any)
+---@field log? fun(self: Spoke.Logger, message: any)
+---@field error? fun(self: Spoke.Logger, message: any)
 
 ---@class Spoke.SpokeError
 ---@field log fun(message: any, cause?: any)

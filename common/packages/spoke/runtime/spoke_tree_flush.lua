@@ -24,14 +24,12 @@ end
 ---@param context Spoke.TickContext
 ---@return boolean
 local function tick_once(tree, context)
-  local ok, error_value = xpcall(function()
-    context:tick_next()
-  end, identity)
+  local ok, error_value = xpcall(context.tick_next, identity, context)
   if ok then
     return true
   end
   local fault = SpokeException.is(error_value)
-    and error_value
+    and (error_value --[[@as Spoke.SpokeException]])
     or EpochFrame.wrap_fault(tree, "Tick", error_value)
   halt(tree, fault, "[SpokeTree] flush error")
   return false

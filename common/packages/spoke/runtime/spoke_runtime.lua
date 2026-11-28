@@ -10,23 +10,27 @@ local MAX_FLUSH_PASSES = 100
 
 ---@class Spoke.SpokeRuntime
 ---@field frames Spoke.Frame[]
----@field _frame_aux Spoke.FrameAux[]
+---@field _frame_versions integer[]
+---@field _frame_on_pop table<integer, (fun())[]?>
 ---@field _clock integer
 ---@field _entry_count integer
 ---@field _scheduled_trees Spoke.Heap<Spoke.SpokeTreeInternal>
 ---@field _boosted_trees table<Spoke.SpokeTreeInternal, boolean>
+---@field _boost_count integer
 ---@field _hold_count integer
 ---@field _flush_layer number
 ---@field _flush_depth integer
 ---@field FrameKind table<Spoke.FrameKind, Spoke.FrameKind>
 local SpokeRuntime = {
   frames = {},
-  _frame_aux = {},
+  _frame_versions = {},
+  _frame_on_pop = {},
   _clock = 0,
   _entry_count = 0,
   ---@diagnostic disable-next-line: assign-type-mismatch
   _scheduled_trees = nil,
   _boosted_trees = {},
+  _boost_count = 0,
   _hold_count = 0,
   _flush_layer = math.huge,
   _flush_depth = 0,
@@ -60,9 +64,10 @@ function SpokeRuntime.next_timestamp()
 end
 
 ---@param frame? Spoke.Frame
+---@param reuse_handle? Spoke.FrameHandle
 ---@return Spoke.FrameHandle
-function SpokeRuntime.push(frame)
-  return RuntimeFrames.push(SpokeRuntime, frame)
+function SpokeRuntime.push(frame, reuse_handle)
+  return RuntimeFrames.push(SpokeRuntime, frame, reuse_handle)
 end
 
 function SpokeRuntime.pop()
@@ -74,18 +79,20 @@ function SpokeRuntime.snapshot_frames()
   return RuntimeFrames.snapshot(SpokeRuntime)
 end
 
+---@package
 ---@return Spoke.FrameHandle?
 function SpokeRuntime.current_handle()
   return RuntimeFrames.current_handle(SpokeRuntime)
 end
 
----@param fn fun()
-function SpokeRuntime.batch(fn)
+---@param fn fun(...: any)
+---@param ... any
+function SpokeRuntime.batch(fn, ...)
   if type(fn) ~= "function" then
     error("SpokeRuntime.batch expects a function", 2)
   end
   SpokeRuntime._hold_count = SpokeRuntime._hold_count + 1
-  local ok, error_value = xpcall(fn, identity)
+  local ok, error_value = xpcall(fn, identity, ...)
   SpokeRuntime._hold_count = SpokeRuntime._hold_count - 1
   if SpokeRuntime._hold_count == 0 then
     SpokeRuntime.try_flush()
@@ -95,12 +102,14 @@ function SpokeRuntime.batch(fn)
   end
 end
 
+---@package
 ---@param message any
 ---@param cause? any
 function SpokeRuntime._log(message, cause)
   SpokeError.log(message, cause)
 end
 
+---@package
 ---@return boolean
 function SpokeRuntime._has_pending()
   return TreeQueue.has_live_head(SpokeRuntime._scheduled_trees)
@@ -113,7 +122,7 @@ local function may_flush_tree(tree)
     return false
   end
   local current_layer = SpokeRuntime._flush_layer
-  if SpokeRuntime._boosted_trees[tree] then
+  if SpokeRuntime._boost_count > 0 and SpokeRuntime._boosted_trees[tree] then
     return tree._flush_layer <= current_layer
   end
   return tree._flush_layer < current_layer
@@ -133,27 +142,38 @@ end
 
 ---@param tree Spoke.SpokeTreeInternal
 function SpokeRuntime.try_scoped_layer_boost(tree)
-  local handle = SpokeRuntime.current_handle()
-  if not handle or tree._flush_layer > SpokeRuntime._flush_layer then
+  local index = #SpokeRuntime.frames
+  if index == 0 or tree._flush_layer > SpokeRuntime._flush_layer then
     return
   end
   if SpokeRuntime._boosted_trees[tree] then
     return
   end
   SpokeRuntime._boosted_trees[tree] = true
-  handle:on_pop_self(function()
-    SpokeRuntime._boosted_trees[tree] = nil
-    SpokeRuntime._scheduled_trees:rebuild()
-  end)
+  SpokeRuntime._boost_count = SpokeRuntime._boost_count + 1
+  local on_pop = SpokeRuntime._frame_on_pop
+  local actions = on_pop[index]
+  local clear_boost = function()
+    if SpokeRuntime._boosted_trees[tree] then
+      SpokeRuntime._boosted_trees[tree] = nil
+      SpokeRuntime._boost_count = SpokeRuntime._boost_count - 1
+      if tree._runtime_pending then
+        SpokeRuntime._scheduled_trees:rebuild()
+      end
+    end
+  end
+  if actions == nil then
+    on_pop[index] = { clear_boost }
+  else
+    actions[#actions + 1] = clear_boost
+  end
 end
 
 ---@param tree Spoke.SpokeTreeInternal
 function SpokeRuntime.tick_tree(tree)
   local previous_layer = SpokeRuntime._flush_layer
   SpokeRuntime._flush_layer = math.min(previous_layer, tree._flush_layer)
-  local ok, error_value = xpcall(function()
-    tree:_tick()
-  end, identity)
+  local ok, error_value = xpcall(tree._tick, identity, tree)
   SpokeRuntime._flush_layer = previous_layer
   if not ok then
     SpokeRuntime._log("Uncaught Spoke error", error_value)
@@ -203,13 +223,16 @@ function SpokeRuntime.try_flush()
   SpokeRuntime._flush_depth = SpokeRuntime._flush_depth - 1
 end
 
+---@package
 function SpokeRuntime._reset_for_tests()
   SpokeRuntime.frames = {}
-  SpokeRuntime._frame_aux = {}
+  SpokeRuntime._frame_versions = {}
+  SpokeRuntime._frame_on_pop = {}
   SpokeRuntime._clock = 0
   SpokeRuntime._entry_count = 0
   TreeQueue.drain(SpokeRuntime._scheduled_trees)
   SpokeRuntime._boosted_trees = {}
+  SpokeRuntime._boost_count = 0
   SpokeRuntime._hold_count = 0
   SpokeRuntime._flush_layer = math.huge
   SpokeRuntime._flush_depth = 0

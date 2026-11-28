@@ -77,7 +77,7 @@
 | 用途 | 响应式运行时与生命周期管理（Epoch / Ticker / SpokeTree / Dock / Trigger / State / Effect / Memo / Phase） |
 | 落位 | `common/packages/spoke/`，门面 `require("common.packages.spoke.api")` |
 | 上游 | 同级仓库 `spoke` |
-| 上游 commit | `f3c6d5c2cdcc900b6ddbef3d141bba454a29619a`（2026-11-28）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
+| 上游 commit | `6a278cd3aa30f53572a8826595d7d01f355d3c4e`（2026-11-29）；纯拷贝，一次同步记一个 SHA；库与 `.dsh/skills/spoke/` 技能必须同源 |
 | 升级 | 从上游检出整体重拷 `common/packages/spoke/` 与技能，再更新本表 SHA |
 | 约束 | 不就地修改包内文件；不搬上游 `tests/`；不改写上游技能 |
 
@@ -85,10 +85,10 @@
 
 | 项 | 值 |
 |---|---|
-| 用途 | SE 宿主装配：树随 `Unit.Destroying` 销毁（先翻 `is_alive` 再 detach）、带树名前缀的 logger、`State<boolean> is_alive` |
+| 用途 | SE 宿主装配：树随 `Unit.Destroying` 销毁（先翻 `is_alive` 再 detach）、带树名前缀的 logger、`State<boolean> is_alive`、`connect` 信号连接清理助手 |
 | 落位 | `common/packages/spoke_eggy/`，门面 `require("common.packages.spoke_eggy.api")`；不进核心 `api.lua` 的 13 类 |
 | 上游 | 同 `spoke` 仓，与核心包同一次同步 |
-| 上游 commit | 与 `spoke` 相同：`f3c6d5c2cdcc900b6ddbef3d141bba454a29619a`（2026-11-28） |
+| 上游 commit | 与 `spoke` 相同：`6a278cd3aa30f53572a8826595d7d01f355d3c4e`（2026-11-29） |
 | 依赖 | 只 require `common.packages.spoke.*`（门面与 `runtime.spoke_error`）；核心不反向 require |
 | 升级 | 与 `spoke` 一起整体重拷，不单独记 SHA |
 | 约束 | 不就地修改；不搬上游 `tests/host/spoke_eggy_spec.lua`，加载与生命周期由 `tests/probes/spoke_eggy_load.lua` 覆盖 |
@@ -98,6 +98,8 @@
 2026-11-24 同步到 `7b822fe3fa0df940e5048320f1f162657e4fff28`：上游 `4e614ba`（[#44](https://github.com/qinyuanj/spoke/pull/44)）清掉包内复述式注释，并把 `Epoch:_compare_to` 内联进 `Epoch:compare_to`；`5d1af3a`（[#45](https://github.com/qinyuanj/spoke/pull/45)）只改上游 `.gitignore`，不进同步目录。核心包 33 个文件与 `spoke_eggy/api.lua` 按原始字节整包重拷，技能字节未变。
 
 2026-11-28 同步到 `f3c6d5c2cdcc900b6ddbef3d141bba454a29619a`：纳入 LuaLS 类型标注、运行时与响应式内部封装调整，以及独立 Epoch 比较/销毁和 Dock 重入 drop 防护。核心包与 `spoke_eggy` 共 36 个文件按原始字节更新；技能 5 个文件逐字节复核未变。
+
+2026-11-29 同步到 `6a278cd3aa30f53572a8826595d7d01f355d3c4e`（上游 [#47](https://github.com/qinyuanj/spoke/pull/47)）：纳入 `PackedTreeCoords` 内联、数组式 frame stack、减少响应式每 tick 闭包分配、修复 Epoch detach 边界与 Trigger dispatch 残留引用、`spoke_eggy.connect` 辅助函数，以及清理未实测的 SE 全局假设。核心包 28 个文件、`spoke_eggy/api.lua` 与技能 `references/eggy-integration.md` 按原始字节整包更新，其余文件逐字节复核未变。
 
 ## 架构图上的位置
 

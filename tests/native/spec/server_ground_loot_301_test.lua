@@ -348,9 +348,9 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     local bar_before = #(env.events.ItemBarState and env.events.ItemBarState.clients or {})
     local batches = 0
     local original = SpokeRuntime.batch
-    SpokeRuntime.batch = function(fn)
+    SpokeRuntime.batch = function(fn, ...)
       batches = batches + 1
-      return original(fn)
+      return original(fn, ...)
     end
     local ok_call, err_call = pcall(function()
       fire_pickup(env, player, loot_id)
@@ -371,9 +371,9 @@ describe("钓鱼区地面物品与鱼饵刷新（#301 服务端宿主）", funct
     local bar = GameCfg.Items.ContainerId.ItemBar
     loot_before = #env.events.LootState.clients
     batches = 0
-    SpokeRuntime.batch = function(fn)
+    SpokeRuntime.batch = function(fn, ...)
       batches = batches + 1
-      return original(fn)
+      return original(fn, ...)
     end
     ok_call, err_call = pcall(function()
       fire_drop(env, player, { action = "Drop", container = bar, index = 1 })

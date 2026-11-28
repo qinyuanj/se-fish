@@ -34,9 +34,7 @@ local Memo = Computation.extend("Memo", {
     if self._selector == nil then
       return
     end
-    local builder = MemoBuilder.new(function(signal)
-      self:_add_dynamic_trigger(signal)
-    end, s)
+    local builder = MemoBuilder.new(self._add_dynamic_fn, s)
     self._state:set(self._selector(builder))
   end,
 })

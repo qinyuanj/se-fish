@@ -20,18 +20,33 @@ function EpochClass.new_instance(class, ...)
     _attached = false,
     _tick_index = -1,
     _frame_depth = 0,
+    _frame_handle = nil,
+    _reusable_handle = nil,
+    _epoch_ports = nil,
     _detach_requested = false,
     _is_ticker = class.is_ticker == true,
     _auto_arm_tick_after_init = class.auto_arm_tick_after_init ~= false,
+    _is_pending = false,
+    _parent = nil,
+    _coord_index = 0,
+    _import_index = -1,
+    _depth = 0,
+    _coords = nil,
+    _tick_cursor = nil,
+    _ticker = nil,
+    _tree = nil,
+    _request_tick = nil,
+    _tick_block = nil,
   }, class)
-  local args = table.pack(...)
-  local start = 1
-  if args.n >= 1 and type(args[1]) == "string" then
-    self.name = args[1]
-    start = 2
-  end
-  if type(class.constructor) == "function" then
-    class.constructor(self, table.unpack(args, start, args.n))
+  local ctor = class.constructor
+  local count = select("#", ...)
+  if count >= 1 and type((...)) == "string" then
+    self.name = ...
+    if type(ctor) == "function" then
+      ctor(self, select(2, ...))
+    end
+  elseif type(ctor) == "function" then
+    ctor(self, ...)
   end
   return self
 end

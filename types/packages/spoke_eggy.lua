@@ -16,4 +16,10 @@ local M = {}
 ---@return SpokeEggyBehaviour
 function M.behaviour(unit, init, options) end
 
+---@param s any
+---@param signal any
+---@param fn fun(...: any)
+---@return any
+function M.connect(s, signal, fn) end
+
 return M

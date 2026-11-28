@@ -44,6 +44,12 @@ local function identity(value)
 end
 
 ---@param tree Spoke.SpokeTreeInternal
+---@param services? table<string, any>
+local function attach_tree(tree, services)
+  tree:_attach(nil, 0, nil, services, tree)
+end
+
+---@param tree Spoke.SpokeTreeInternal
 ---@param mode Spoke.FlushMode
 ---@param services? table<string, any>
 ---@return boolean ok
@@ -55,11 +61,8 @@ local function run_bootstrap(tree, mode, services)
   SpokeRuntime.push({
     type = "Bootstrap",
     epoch = tree,
-    phase = "Bootstrap",
   })
-  local ok, error_value = xpcall(function()
-    tree:_attach(nil, 0, nil, services, tree)
-  end, identity)
+  local ok, error_value = xpcall(attach_tree, identity, tree, services)
   tree._bootstrapping = false
   if ok and mode == "Auto" then
     SpokeRuntime.try_flush()
@@ -75,7 +78,10 @@ end
 ---@param services? table<string, any>
 ---@return Spoke.SpokeTree
 local function create(name, root, mode, layer, services)
-  if type(root) ~= "table" or type((root --[[@as Spoke.EpochInternal]])._attach) ~= "function" then
+  local root_internal = root --[[@as Spoke.EpochInternal]]
+  if type(root) ~= "table"
+    or type(root_internal._attach) ~= "function"
+    or root_internal._attached then
     error("SpokeTree.spawn expects an unattached Epoch root", 2)
   end
   ---@type Spoke.SpokeTreeInternal
@@ -212,10 +218,9 @@ end
 ---@param error_value any
 function internal:_log_error(message, error_value)
   local logger = self._logger
-  if type(logger) == "table" and type(logger.error) == "function" then
-    pcall(function()
-      logger:error(message .. "\n" .. tostring(error_value))
-    end)
+  local err_fn = type(logger) == "table" and logger.error or nil
+  if type(err_fn) == "function" then
+    pcall(err_fn, logger --[[@as Spoke.Logger]], message .. "\n" .. tostring(error_value))
   else
     SpokeError.log(message, error_value)
   end

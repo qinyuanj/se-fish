@@ -36,7 +36,7 @@ end
 function methods:_heapify_up(index)
   local value = self._values[index]
   while index > 1 do
-    local parent = math.floor(index / 2)
+    local parent = index // 2
     if self._compare(value, self._values[parent]) >= 0 then
       break
     end
@@ -103,7 +103,7 @@ function methods:clear()
 end
 
 function methods:rebuild()
-  for index = math.floor(#self._values / 2), 1, -1 do
+  for index = #self._values // 2, 1, -1 do
     self:_heapify_down(index)
   end
 end

@@ -33,13 +33,35 @@ local function walk_children(epoch, visit)
   end
 end
 
+local scratch_stack = {}
+
 ---@param epoch Spoke.Epoch
 ---@return integer
 function IntrospectTree.count_nodes(epoch)
-  local count = 1
-  walk_children(epoch, function(child)
-    count = count + IntrospectTree.count_nodes(child)
-  end)
+  for i = #scratch_stack, 1, -1 do
+    scratch_stack[i] = nil
+  end
+  local count = 0
+  local top = 1
+  scratch_stack[1] = epoch
+  while top > 0 do
+    local node = scratch_stack[top]
+    scratch_stack[top] = nil
+    top = top - 1
+    count = count + 1
+    local internal = node --[[@as Spoke.EpochInternal]]
+    if type(internal._get_children) == "function" then
+      local children = internal:_get_children(scratch_stack)
+      if children ~= scratch_stack then
+        for i = 1, #children do
+          top = top + 1
+          scratch_stack[top] = children[i]
+        end
+      else
+        top = #scratch_stack
+      end
+    end
+  end
   return count
 end
 

@@ -20,9 +20,14 @@ function SpokeHandle.of(id, on_dispose)
   }, methods)
 end
 
+local NOOP = setmetatable({
+  _id = nil,
+  _on_dispose = nil,
+}, methods)
+
 ---@return Spoke.SpokeHandle
 function SpokeHandle.new()
-  return SpokeHandle.of(nil, nil)
+  return NOOP
 end
 
 ---@param value any

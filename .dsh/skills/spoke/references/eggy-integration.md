@@ -51,9 +51,10 @@ end, { name = "Panel" })
 
 - 树根常用一个首次挂载后不读信号的 Effect 来搭建子结构，因为 `effect`、`memo`、`phase`、`dock` 组合方法在 EffectBuilder 上，而不在普通 Epoch builder 上。
 - join/leave 等结构事件不改变 State 的值，使用静态 Trigger，例如 `s:effect(block, { roster_changed })`；score 等值变化通过 `s:d(state)` 跟踪。
-- 在有效挂载窗口内捕获 `local dock = s:dock(...)` 到 upvalue，宿主事件之后调用 `dock:call(id, epoch)` / `dock:drop(id)`。builder 在窗口外密封，Dock 不是。
+- 在有效挂载窗口内捕获 `local dock = s:dock(...)` 到 upvalue，宿主事件之后调用 `dock:call(id, epoch)` / `dock:drop(id)`。builder 在窗口外密封，Dock 不是。Dock 键必须是非空字符串；SE 客户端 `Unit.Name` 可能为空串 `""`，切勿直接用 `unit.Name` 作键，应使用稳定业务 ID（如 `tostring(role_id)`）。
 - 同一事件写多个 State 时，用深 require 的 `SpokeRuntime.batch(fn)` 延迟 Auto 树 flush，让同时依赖多个值的 Effect 只看到最外层 release 后的最终组合；普通 State subscriber 仍逐次收到每次写入。
-- 共享状态用单例树加 `s:export` / `s:import`（字符串 key）串起来。
+- 跨树共享 State / Trigger 放在共享模块表中，或通过 `SpokeTree.spawn(name, root, services)` 与 `spoke_eggy.behaviour(unit, init, { services = ... })` 注入后在同树内 `s:import`；`s:export` 只在单棵树的祖先链内可见，不能跨树导入。
+- 连接 SE 的 `Signal`（如 `RunService.Heartbeat` 或自定义事件）时，使用 `spoke_eggy.connect(s, signal, fn)` 自动在回滚与拆树时调用 `Disconnect()`。
 
 ## 错误处理
 

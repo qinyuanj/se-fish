@@ -19,9 +19,11 @@ function TreeQueue.make_comparator(runtime)
     if by_layer ~= 0 then
       return by_layer
     end
-    local by_boost = compare_boost(a, b, runtime._boosted_trees)
-    if by_boost ~= 0 then
-      return by_boost
+    if runtime._boost_count > 0 then
+      local by_boost = compare_boost(a, b, runtime._boosted_trees)
+      if by_boost ~= 0 then
+        return by_boost
+      end
     end
     return Ordering.compare(a._timestamp --[[@as integer]], b._timestamp --[[@as integer]])
   end

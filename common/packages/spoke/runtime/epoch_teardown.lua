@@ -5,12 +5,11 @@ local EpochTeardown = {}
 ---@return boolean ok
 ---@return any ...
 local function release_disposable(record)
-  if type(record.value) == "function" then
-    return pcall(record.value)
+  local value = record.value
+  if type(value) == "function" then
+    return pcall(value)
   end
-  return pcall(function()
-    record.value:dispose()
-  end)
+  return pcall(value.dispose, value)
 end
 
 ---@class Spoke.AttachmentReleaser
@@ -28,13 +27,11 @@ local RELEASERS = {
   call = {
     message = "Failed to cleanup child of '%s'",
     release = function(record)
-      return pcall(function()
-        record.value:detach()
-      end)
+      local child = record.value
+      return pcall(child.detach, child)
     end,
   },
   use = { message = "Dispose failed in '%s'", release = release_disposable },
-  handle = { message = "Dispose failed in '%s'", release = release_disposable },
 }
 
 ---@param epoch Spoke.EpochInternal

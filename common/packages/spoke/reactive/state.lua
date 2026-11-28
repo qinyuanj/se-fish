@@ -14,16 +14,9 @@ local State = {}
 ---@class Spoke.StateImpl: Spoke.State<any>
 ---@field private _value any
 ---@field private _trigger Spoke.Trigger<any>
----@field private _equals fun(a: any, b: any): boolean
+---@field private _equals (fun(a: any, b: any): boolean)?
 local methods = State --[[@as table]]
 methods.__index = methods
-
----@param a any
----@param b any
----@return boolean
-local function default_equals(a, b)
-  return a == b
-end
 
 ---@param name string?
 ---@param initial any
@@ -34,7 +27,7 @@ local function make_state(name, initial, equals)
     name = name,
     _value = initial,
     _trigger = Trigger.new(),
-    _equals = equals or default_equals,
+    _equals = equals,
   }, methods)
 end
 
@@ -47,23 +40,21 @@ end
 ---@return Spoke.State<any>
 function State.new(...)
   local arg_count = select("#", ...)
-  local args = { ... }
+  local a, b, c = ...
   local name = nil
   local initial = nil
   local equals = nil
 
-  if arg_count == 0 then
-    initial = nil
-  elseif arg_count == 1 then
-    initial = args[1]
+  if arg_count == 1 then
+    initial = a
   elseif arg_count >= 2 then
-    if type(args[1]) == "string" then
-      name = args[1]
-      initial = args[2]
-      equals = args[3]
+    if type(a) == "string" then
+      name = a
+      initial = b
+      equals = c
     else
-      initial = args[1]
-      equals = args[2]
+      initial = a
+      equals = b
     end
   end
 
@@ -87,7 +78,12 @@ function methods:now()
 end
 
 function methods:set(value)
-  if self._equals(self._value, value) then
+  local equals = self._equals
+  if equals ~= nil then
+    if equals(self._value, value) then
+      return
+    end
+  elseif self._value == value then
     return
   end
   self._value = value

@@ -39,6 +39,8 @@ methods.__index = methods
 ---@field _tick_index integer
 ---@field _frame_depth integer
 ---@field _frame_handle Spoke.FrameHandle?
+---@field _reusable_handle Spoke.FrameHandle?
+---@field _epoch_ports Spoke.Ports?
 ---@field _detach_requested boolean
 ---@field _detaching? boolean
 ---@field _is_ticker boolean
@@ -112,13 +114,6 @@ local function compare_across_trees(epoch, other)
   return 0
 end
 
----@param epoch Spoke.EpochInternal
----@param other Spoke.EpochInternal
----@return boolean
-local function both_cursors_valid(epoch, other)
-  return epoch._tick_cursor:is_valid() and other._tick_cursor:is_valid()
-end
-
 ---@param other Spoke.Epoch
 ---@return integer
 function methods:compare_to(other)
@@ -127,8 +122,10 @@ function methods:compare_to(other)
   if a._tree ~= b._tree then
     return compare_across_trees(a, b)
   end
-  if both_cursors_valid(a, b) then
-    return a._tick_cursor:compare_to(b._tick_cursor)
+  local cursor_a = a._tick_cursor
+  local cursor_b = b._tick_cursor
+  if cursor_a.depth < 255 and cursor_b.depth < 255 then
+    return cursor_a:compare_to(cursor_b)
   end
   return EpochCursor.compare(a, b)
 end
@@ -136,6 +133,25 @@ end
 ---@return string
 function methods:__tostring()
   return self.name or "Epoch"
+end
+
+---@param builder Spoke.EpochBuilderInternal
+---@param services? table<string, any>
+---@return Spoke.EpochTickFn?
+local function run_init(builder, services)
+  local epoch = builder._owner
+  EpochAttach.export_services(epoch, services)
+  return EpochAttach.invoke_init(epoch, builder)
+end
+
+---@param builder Spoke.EpochBuilderInternal
+local function run_tick(builder)
+  local epoch = builder._owner
+  epoch:_detach_from(epoch._tick_index)
+  local tick_block = epoch._tick_block
+  if tick_block then
+    return tick_block(builder)
+  end
 end
 
 ---@param parent? Spoke.EpochInternal
@@ -150,10 +166,7 @@ function internal:_attach(parent, index, ticker, services, tree)
   EpochAttach.link_into_tree(self, parent, index, ticker, tree)
   self._request_tick = EpochScheduling.make_request_tick(self)
 
-  local ok, result, frame = EpochFrame.run(self, "Init", function(builder)
-    EpochAttach.export_services(self, services)
-    return EpochAttach.invoke_init(self, builder)
-  end)
+  local ok, result, frame = EpochFrame.run(self, "Init", run_init, services)
   if not ok then
     EpochFrame.fail(self, "Init", frame, result)
   end
@@ -173,6 +186,7 @@ function internal:_detach_from(index)
 end
 
 function internal:_perform_detach()
+  self._detach_requested = false
   if self.is_detached or not self._attached or self._detaching then
     return
   end
@@ -207,12 +221,7 @@ function internal:_tick()
     self._is_ticking = true
   end
 
-  local ok, result, frame = EpochFrame.run(self, "Tick", function(builder)
-    self:_detach_from(self._tick_index)
-    if self._tick_block then
-      return self._tick_block(builder)
-    end
-  end)
+  local ok, result, frame = EpochFrame.run(self, "Tick", run_tick)
   if not ok then
     EpochFrame.fail(self, "Tick", frame, result)
   end
@@ -225,7 +234,7 @@ function internal:_refresh_coords()
   self._coords = EpochCursor.resolve_coords(self)
   self._tick_cursor = EpochCursor.resolve_cursor(self)
   for _, record in ipairs(self._attachments) do
-    if record.kind == "call" then
+    if record.kind == "call" and not record.value.is_detached then
       record.value:_refresh_coords()
     end
   end
@@ -257,7 +266,7 @@ end
 function internal:_get_children(store)
   store = store or {}
   for _, record in ipairs(self._attachments) do
-    if record.kind == "call" then
+    if record.kind == "call" and not record.value.is_detached then
       store[#store + 1] = record.value
     end
   end

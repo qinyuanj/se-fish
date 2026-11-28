@@ -1,4 +1,3 @@
-local SpokeHandle = require("common.packages.spoke.runtime.spoke_handle")
 local SpokeError = require("common.packages.spoke.runtime.spoke_error")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
@@ -8,7 +7,7 @@ local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 ---@alias Spoke.Disposable Spoke.DisposableTable | fun()
 
 ---@class Spoke.EpochAttachment
----@field kind "call" | "cleanup" | "use" | "handle" | "export"
+---@field kind "call" | "cleanup" | "use" | "export"
 ---@field key? string
 ---@field value any
 
@@ -20,7 +19,6 @@ EpochBuilder.__index = EpochBuilder
 ---@field _owner Spoke.EpochInternal
 ---@field _active boolean
 ---@field _frame_handle Spoke.FrameHandle?
----@field package _ports Spoke.Ports?
 
 ---@param message any
 local log_sink = function(message)
@@ -84,7 +82,6 @@ function EpochBuilder.new(owner, frame_handle)
     _owner = owner,
     _active = true,
     _frame_handle = frame_handle,
-    _ports = nil,
   }, EpochBuilder)
 end
 
@@ -126,7 +123,7 @@ function EpochBuilder:use(resource)
     error("EpochBuilder:use expects a disposable resource", 2)
   end
   attach_record(self, {
-    kind = SpokeHandle.is(resource) and "handle" or "use",
+    kind = "use",
     value = resource,
   })
   return resource
@@ -135,11 +132,13 @@ end
 ---@return Spoke.Ports
 function EpochBuilder:ports()
   assert_active(self)
-  local this = self --[[@as Spoke.EpochBuilderInternal]]
-  if not this._ports then
-    this._ports = setmetatable({ _owner = this._owner }, Ports)
+  local owner = (self --[[@as Spoke.EpochBuilderInternal]])._owner
+  local ports = owner._epoch_ports
+  if not ports then
+    ports = setmetatable({ _owner = owner }, Ports)
+    owner._epoch_ports = ports
   end
-  return this._ports
+  return ports
 end
 
 ---@param log_s Spoke.EpochBuilder
@@ -150,13 +149,12 @@ local function emit_log(log_s, message)
   local found, logger = log_s:try_import("logger")
   local text = tostring(message) .. "\n\n"
     .. SpokeIntrospect.tree_trace(SpokeRuntime.snapshot_frames())
-  pcall(function()
-    if found and type(logger) == "table" and type(logger.log) == "function" then
-      logger:log(text)
-    else
-      log_sink(text)
-    end
-  end)
+  local log_fn = found and type(logger) == "table" and logger.log or nil
+  if type(log_fn) == "function" then
+    pcall(log_fn, logger, text)
+  else
+    pcall(log_sink, text)
+  end
   return nil
 end
 

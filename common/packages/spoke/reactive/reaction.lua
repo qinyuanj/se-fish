@@ -23,9 +23,7 @@ local Reaction = Computation.extend("Reaction", {
   ---@param s Spoke.EpochBuilder
   on_run = function(self, s)
     if self._block ~= nil then
-      self._block(EffectBuilder.new(function(signal)
-        self:_add_dynamic_trigger(signal)
-      end, s))
+      self._block(EffectBuilder.new(self._add_dynamic_fn, s))
     end
   end,
 })

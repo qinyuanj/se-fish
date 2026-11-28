@@ -1,13 +1,11 @@
 local Epoch = require("common.packages.spoke.runtime.epoch")
 
----@class Spoke.DynamicDepSlot
----@field trigger Spoke.Subscribable<any>
----@field handle Spoke.SpokeHandle
-
 ---@class Spoke.DependencyTracker: Spoke.DisposableTable
 ---@field private _schedule fun()
----@field private _static_handles Spoke.SpokeHandle[]
----@field private _dynamic Spoke.DynamicDepSlot[]
+---@field private _static_handles table<integer, Spoke.SpokeHandle?>
+---@field private _dyn_triggers table<integer, Spoke.Subscribable<any>?>
+---@field private _dyn_handles table<integer, Spoke.SpokeHandle?>
+---@field private _dyn_count integer
 ---@field private _slot_callbacks (fun())[]
 ---@field private _dep_index integer
 local DependencyTracker = {}
@@ -19,7 +17,9 @@ function DependencyTracker.new(schedule)
   return setmetatable({
     _schedule = schedule,
     _static_handles = {},
-    _dynamic = {},
+    _dyn_triggers = {},
+    _dyn_handles = {},
+    _dyn_count = 0,
     _slot_callbacks = {},
     _dep_index = 0,
   }, DependencyTracker)
@@ -36,35 +36,58 @@ end
 
 ---@param trigger Spoke.Subscribable<any>
 function DependencyTracker:add_dynamic(trigger)
-  local slot = self._dynamic[self._dep_index + 1]
-  if slot == nil then
-    self._dynamic[self._dep_index + 1] = {
-      trigger = trigger,
-      handle = trigger:subscribe(self:_schedule_from_index(self._dep_index)),
-    }
-  elseif slot.trigger ~= trigger then
-    slot.handle:dispose()
-    slot.trigger = trigger
-    slot.handle = trigger:subscribe(self:_schedule_from_index(self._dep_index))
+  local slot_idx = self._dep_index + 1
+  local cur_trigger = self._dyn_triggers[slot_idx]
+  if cur_trigger == nil then
+    self._dyn_triggers[slot_idx] = trigger
+    self._dyn_handles[slot_idx] = trigger:subscribe(self:_schedule_from_index(self._dep_index))
+    if slot_idx > self._dyn_count then
+      self._dyn_count = slot_idx
+    end
+  elseif cur_trigger ~= trigger then
+    local old_handle = self._dyn_handles[slot_idx]
+    if old_handle ~= nil then
+      old_handle:dispose()
+    end
+    self._dyn_triggers[slot_idx] = trigger
+    self._dyn_handles[slot_idx] = trigger:subscribe(self:_schedule_from_index(self._dep_index))
   end
-  self._dep_index = self._dep_index + 1
+  self._dep_index = slot_idx
 end
 
 function DependencyTracker:end_dynamic()
-  while #self._dynamic > self._dep_index do
-    table.remove(self._dynamic).handle:dispose()
+  for index = self._dyn_count, self._dep_index + 1, -1 do
+    local handle = self._dyn_handles[index]
+    self._dyn_triggers[index] = nil
+    self._dyn_handles[index] = nil
+    if handle ~= nil then
+      handle:dispose()
+    end
+  end
+  if self._dep_index < self._dyn_count then
+    self._dyn_count = self._dep_index
   end
 end
 
 function DependencyTracker:dispose()
-  for _, handle in ipairs(self._static_handles) do
-    handle:dispose()
+  local static_handles = self._static_handles
+  for index = 1, #static_handles do
+    local handle = static_handles[index]
+    static_handles[index] = nil
+    if handle ~= nil then
+      handle:dispose()
+    end
   end
-  for _, slot in ipairs(self._dynamic) do
-    slot.handle:dispose()
+  for index = 1, self._dyn_count do
+    local handle = self._dyn_handles[index]
+    self._dyn_triggers[index] = nil
+    self._dyn_handles[index] = nil
+    if handle ~= nil then
+      handle:dispose()
+    end
   end
-  self._static_handles = {}
-  self._dynamic = {}
+  self._dyn_count = 0
+  self._dep_index = 0
 end
 
 ---@param index integer
@@ -129,6 +152,7 @@ end
 ---@class Spoke.Computation: Spoke.Epoch
 ---@field package _triggers Spoke.Subscribable<any>[]
 ---@field package _tracker Spoke.DependencyTracker
+---@field protected _add_dynamic_fn fun(signal: Spoke.Subscribable<any>)
 ---@field constructor fun(self: Spoke.Computation, triggers?: Spoke.TriggerList)
 ---@field on_run fun(self: Spoke.Computation, s: Spoke.EpochBuilder)
 ---@field protected _add_static_trigger fun(self: Spoke.Computation, trigger: Spoke.Subscribable<any>)
@@ -153,14 +177,15 @@ local Computation = Epoch.extend("Computation", {
     end)
     s:use(tracker)
     self._tracker = tracker
+    self._add_dynamic_fn = function(signal)
+      tracker:add_dynamic(signal)
+    end
     for _, trigger in ipairs(self._triggers) do
       tracker:add_static(trigger)
     end
     return function(tick_s)
       tracker:begin_dynamic()
-      local ok, err = pcall(function()
-        self:on_run(tick_s)
-      end)
+      local ok, err = pcall(self.on_run, self, tick_s)
       tracker:end_dynamic()
       if not ok then
         error(err, 0)

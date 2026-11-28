@@ -1,8 +1,6 @@
 ---@class Spoke.IntrospectLabels
 local IntrospectLabels = {}
 
-local rawequal = rawequal or function(a, b) return a == b end
-
 ---@param frame Spoke.Frame
 ---@return Spoke.FrameKind | string
 function IntrospectLabels.frame_kind(frame)
@@ -47,7 +45,7 @@ end
 function IntrospectLabels.frame_epoch_label(epoch, frames)
   local indices = {}
   for index, frame in ipairs(frames) do
-    if rawequal(frame.epoch, epoch) then
+    if frame.epoch == epoch then
       indices[#indices + 1] = tostring(index - 1)
     end
   end

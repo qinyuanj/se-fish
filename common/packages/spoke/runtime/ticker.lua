@@ -22,6 +22,9 @@ methods.__index = methods
 ---@field _max_passes integer
 ---@field _guard_entry integer
 ---@field _bootstrap_active boolean
+---@field _tick_context Spoke.TickContext?
+---@field _ticker_ports Spoke.TickerPorts?
+---@field _upstream_request (fun())?
 local internal = Ticker --[[@as table]]
 internal.__tostring = Epoch.__tostring
 internal._default_name = "Ticker"
@@ -75,11 +78,23 @@ function methods:bootstrap(s)
   error("Ticker subclasses must implement bootstrap", 2)
 end
 
+---@param a Spoke.EpochInternal
+---@param b Spoke.EpochInternal
+---@return integer
+local function compare_epochs(a, b)
+  return a:compare_to(b)
+end
+
 ---@param ticker Spoke.TickerInternal
 local function run_on_tick_callbacks(ticker)
+  local ctx = ticker._tick_context
+  if not ctx then
+    ctx = setmetatable({ _ticker = ticker }, TickContext)
+    ticker._tick_context = ctx
+  end
   for _, callback in ipairs(ticker._on_tick) do
     if not ticker._paused then
-      callback(setmetatable({ _ticker = ticker }, TickContext))
+      callback(ctx)
     end
   end
 end
@@ -126,9 +141,7 @@ end
 ---@return Spoke.EpochTickFn
 function methods:init(builder)
   local this = self --[[@as Spoke.TickerInternal]]
-  this._pending = Heap.new(function(a, b)
-    return a:compare_to(b)
-  end)
+  this._pending = Heap.new(compare_epochs)
   this._on_tick = {}
   this._paused = false
   this._is_ticking = false
@@ -138,13 +151,12 @@ function methods:init(builder)
   this._max_passes = DEFAULT_MAX_PASSES
   this._guard_entry = -1
   this._bootstrap_active = true
+  this._tick_context = setmetatable({ _ticker = this }, TickContext)
   local ticker_builder = setmetatable({
     _builder = builder,
     _ticker = this,
   }, TickerBuilder)
-  local ok, root = xpcall(function()
-    return this:bootstrap(ticker_builder)
-  end, identity)
+  local ok, root = xpcall(this.bootstrap, identity, this, ticker_builder)
   this._bootstrap_active = false
   if not ok then
     error(root, 0)
@@ -161,13 +173,18 @@ function internal:_request_upstream()
   if self._is_manual then
     return
   end
-  local request = function()
-    if self._is_tree then
-      ---@cast self Spoke.SpokeTreeInternal
-      SpokeRuntime.schedule(self)
-    elseif self._request_tick then
-      self._request_tick()
+  local request = self._upstream_request
+  if not request then
+    local ticker = self
+    request = function()
+      if ticker._is_tree then
+        ---@cast ticker Spoke.SpokeTreeInternal
+        SpokeRuntime.schedule(ticker)
+      elseif ticker._request_tick then
+        ticker._request_tick()
+      end
     end
+    self._upstream_request = request
   end
   local frame = self._frame_handle
   if frame and frame:is_alive() then
@@ -352,7 +369,13 @@ end
 
 ---@return Spoke.TickerPorts
 function TickerBuilder:ports()
-  return setmetatable({ _ticker = self._ticker }, TickerPorts)
+  local ticker = self._ticker
+  local ports = ticker._ticker_ports
+  if not ports then
+    ports = setmetatable({ _ticker = ticker }, TickerPorts)
+    ticker._ticker_ports = ports
+  end
+  return ports
 end
 
 ---@generic T: Spoke.Disposable

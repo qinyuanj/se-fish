@@ -15,17 +15,17 @@ local fs = require("tests.support.fs_fixture")
 local lfs = require("lfs")
 
 -- 上游双包完整性基线（与 docs/packages-reference.md 同步；上游整包升级时一并更新）。
-local UPSTREAM_SPOKE_SHA = "f3c6d5c2cdcc900b6ddbef3d141bba454a29619a"
+local UPSTREAM_SPOKE_SHA = "6a278cd3aa30f53572a8826595d7d01f355d3c4e"
 local PACKAGE_SNAPSHOTS = {
   {
     root = "common/packages/spoke",
     file_count = 35,
-    tree_sha256 = "a991ae2bc443490e5af2d33c99c40524ebb9aa3e3f8341114d92a36cf2835d80",
+    tree_sha256 = "746d42a5eb3e146d94b46180f669f757bacede54530b7d529e68d2ae6ff3c55d",
   },
   {
     root = "common/packages/spoke_eggy",
     file_count = 1,
-    tree_sha256 = "cf1b5db50d0d312869a676361260c9ea2c82d27fb4464524576394854e14c90e",
+    tree_sha256 = "9dbf45fb60250c49af6b381536697b83980ddbfcaa64f1fe7e4af3744724ad42",
   },
 }
 

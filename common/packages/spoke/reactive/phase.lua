@@ -14,14 +14,7 @@ local Phase = Computation.extend("Phase", {
   ---@param block? fun(s: Spoke.EffectBuilder)
   ---@param ... Spoke.TriggerList
   constructor = function(self, mount_when, block, ...)
-    local normalized = collect_triggers(...)
-    local triggers = {}
-    if normalized ~= nil then
-      for index = 1, #normalized do
-        triggers[index] = normalized[index]
-      end
-    end
-    triggers[#triggers + 1] = mount_when
+    local triggers = collect_triggers(...)
     Computation.constructor(self, triggers)
     self._mount_when = mount_when
     self._block = block
@@ -29,14 +22,18 @@ local Phase = Computation.extend("Phase", {
 
   ---@param self Spoke.Phase
   ---@param s Spoke.EpochBuilder
+  ---@return Spoke.EpochTickFn?
+  init = function(self, s)
+    local tick_fn = Computation.init(self, s)
+    self:_add_static_trigger(self._mount_when)
+    return tick_fn
+  end,
+
+  ---@param self Spoke.Phase
+  ---@param s Spoke.EpochBuilder
   on_run = function(self, s)
-    if self._mount_when:now() then
-      local builder = EffectBuilder.new(function(signal)
-        self:_add_dynamic_trigger(signal)
-      end, s)
-      if self._block ~= nil then
-        self._block(builder)
-      end
+    if self._mount_when:now() and self._block ~= nil then
+      self._block(EffectBuilder.new(self._add_dynamic_fn, s))
     end
   end,
 })

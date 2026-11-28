@@ -1,42 +1,45 @@
 ---@class Spoke.Frame
 ---@field epoch Spoke.Epoch?
 ---@field type Spoke.FrameKind|string|nil
----@field kind Spoke.FrameKind|string|nil
----@field phase string?
-
----@class Spoke.FrameAux
----@field version integer
----@field on_pop (fun())[]?
+---@field kind? Spoke.FrameKind|string|nil
+---@field phase? string
 
 ---@class Spoke.RuntimeFrames
 ---@field Handle Spoke.FrameHandle
 local RuntimeFrames = {}
 
 ---@class Spoke.FrameHandle
----@field private _runtime Spoke.SpokeRuntime
----@field private _index integer
----@field private _version integer
+---@field package _runtime Spoke.SpokeRuntime
+---@field package _index integer
+---@field package _version integer
 local Handle = {}
 Handle.__index = Handle
 
 ---@param runtime Spoke.SpokeRuntime
 ---@param frame? Spoke.Frame
+---@param reuse_handle? Spoke.FrameHandle
 ---@return Spoke.FrameHandle
-function RuntimeFrames.push(runtime, frame)
-  if #runtime.frames == 0 then
+function RuntimeFrames.push(runtime, frame, reuse_handle)
+  local frames = runtime.frames
+  local index = #frames + 1
+  if index == 1 then
     runtime._entry_count = runtime._entry_count + 1
   end
-  frame = frame or {}
-  frame.type = frame.type or frame.kind or "None"
-  frame.kind = frame.kind or frame.type
-  local index = #runtime.frames + 1
+  if frame == nil then
+    frame = { type = "None" }
+  elseif frame.type == nil then
+    frame.type = frame.kind or "None"
+  end
   local version = runtime._clock
   runtime._clock = version + 1
-  runtime.frames[index] = frame
-  runtime._frame_aux[index] = {
-    version = version,
-    on_pop = nil,
-  }
+  frames[index] = frame
+  runtime._frame_versions[index] = version
+  runtime._frame_on_pop[index] = nil
+  if reuse_handle ~= nil then
+    reuse_handle._index = index
+    reuse_handle._version = version
+    return reuse_handle
+  end
   return setmetatable({
     _runtime = runtime,
     _index = index,
@@ -51,14 +54,13 @@ function RuntimeFrames.pop(runtime)
   if index == 0 then
     error("SpokeRuntime frame stack is empty", 3)
   end
-  local aux = runtime._frame_aux[index]
-  ---@cast aux -nil
+  local actions = runtime._frame_on_pop[index]
   frames[index] = nil
-  runtime._frame_aux[index] = nil
-  local actions = aux.on_pop
+  runtime._frame_versions[index] = nil
+  runtime._frame_on_pop[index] = nil
   if actions then
-    for _, action in ipairs(actions) do
-      action()
+    for i = 1, #actions do
+      actions[i]()
     end
   end
 end
@@ -66,16 +68,12 @@ end
 ---@param runtime Spoke.SpokeRuntime
 ---@return Spoke.Frame[]
 function RuntimeFrames.snapshot(runtime)
-  local snapshot = {}
-  for index, frame in ipairs(runtime.frames) do
-    snapshot[index] = {
-      epoch = frame.epoch,
-      type = frame.type,
-      kind = frame.kind,
-      phase = frame.phase,
-    }
+  local frames = runtime.frames
+  local count = #frames
+  if count == 0 then
+    return {}
   end
-  return snapshot
+  return table.move(frames, 1, count, 1, {})
 end
 
 ---@param runtime Spoke.SpokeRuntime
@@ -85,27 +83,30 @@ function RuntimeFrames.current_handle(runtime)
   if index == 0 then
     return nil
   end
-  local aux = runtime._frame_aux[index]
-  ---@cast aux -nil
+  local version = runtime._frame_versions[index]
+  ---@cast version -nil
   return setmetatable({
     _runtime = runtime,
     _index = index,
-    _version = aux.version,
+    _version = version,
   }, Handle)
 end
 
 ---@return boolean
 function Handle:is_alive()
   local runtime = self._runtime
-  local aux = runtime._frame_aux[self._index]
-  return aux ~= nil
-    and aux.version == self._version
-    and runtime.frames[self._index] ~= nil
+  local index = self._index
+  return runtime.frames[index] ~= nil
+    and runtime._frame_versions[index] == self._version
 end
 
 ---@return boolean
 function Handle:is_top()
-  return self:is_alive() and self._index == #self._runtime.frames
+  local runtime = self._runtime
+  local index = self._index
+  return index == #runtime.frames
+    and runtime.frames[index] ~= nil
+    and runtime._frame_versions[index] == self._version
 end
 
 ---@return Spoke.Frame?
@@ -125,10 +126,15 @@ function Handle:on_pop_self(fn)
     fn()
     return
   end
-  local aux = self._runtime._frame_aux[self._index]
-  ---@cast aux -nil
-  aux.on_pop = aux.on_pop or {}
-  aux.on_pop[#aux.on_pop + 1] = fn
+  local on_pop = self._runtime._frame_on_pop
+  local index = self._index
+  local actions = on_pop[index]
+  if actions == nil then
+    actions = { fn }
+    on_pop[index] = actions
+  else
+    actions[#actions + 1] = fn
+  end
 end
 
 RuntimeFrames.Handle = Handle

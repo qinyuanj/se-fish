@@ -1,14 +1,12 @@
 local PackedTreeCoords = require("common.packages.spoke.runtime.packed_tree_coords")
 
-local rawequal = rawequal or function(a, b) return a == b end
-
 ---@class Spoke.EpochCursor
 local EpochCursor = {}
 
 ---@param epoch Spoke.EpochInternal
 ---@return integer
 local function leaf_component(epoch)
-  return epoch._tick_index or -1
+  return epoch._tick_index
 end
 
 ---@param epoch Spoke.EpochInternal
@@ -32,7 +30,7 @@ end
 ---@return integer
 ---@return integer
 local function climb_to_common_ancestor(a, b, component_a, component_b)
-  while not rawequal(a, b) do
+  while a ~= b do
     component_a = a._coord_index
     component_b = b._coord_index
     a = a._parent --[[@as Spoke.EpochInternal]]
@@ -54,7 +52,7 @@ end
 ---@param b Spoke.EpochInternal
 ---@return integer
 function EpochCursor.compare(a, b)
-  if rawequal(a, b) then
+  if a == b then
     return 0
   end
   local depth_a = a._depth
