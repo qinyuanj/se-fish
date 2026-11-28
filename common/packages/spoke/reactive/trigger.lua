@@ -2,9 +2,42 @@ local SpokeHandle = require("common.packages.spoke.runtime.spoke_handle")
 local SpokeError = require("common.packages.spoke.runtime.spoke_error")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
-local Trigger = {}
-Trigger.__index = Trigger
+---@class Spoke.Subscribable<T>
+---@field subscribe fun(self: any, fn: fun(value: T)): Spoke.SpokeHandle
 
+---@class Spoke.Signal<T>: Spoke.Subscribable<T>
+---@field now fun(self: any): T
+---@field unsubscribe fun(self: any, fn: fun(value: T))
+
+---@alias Spoke.TriggerList Spoke.Subscribable<any> | Spoke.Subscribable<any>[]
+
+---@class Spoke.TriggerSubscription<T>
+---@field id integer
+---@field fn (fun(value: T))?
+
+---@class Spoke.Trigger<T>: Spoke.Subscribable<T>
+---@field name string?
+---@field subscribe fun(self: Spoke.Trigger<T>, fn: fun(value: T)): Spoke.SpokeHandle
+---@field unsubscribe fun(self: Spoke.Trigger<T>, fn: fun(value: T))
+---@field invoke fun(self: Spoke.Trigger<T>, payload?: T)
+
+---@class Spoke.TriggerClass
+local Trigger = {}
+
+---@class Spoke.TriggerImpl: Spoke.Trigger<any>
+---@field private _subs Spoke.TriggerSubscription<any>[]
+---@field private _dead_count integer
+---@field private _id_count integer
+---@field private _events table<integer, any>
+---@field private _event_head integer
+---@field private _event_tail integer
+---@field private _is_flushing boolean
+---@field private _dispatch_list (fun(value: any))[]?
+local methods = Trigger --[[@as table]]
+methods.__index = methods
+
+---@param name? string
+---@return Spoke.Trigger<any>
 function Trigger.new(name)
   local self = setmetatable({
     name = name,
@@ -16,10 +49,15 @@ function Trigger.new(name)
     _event_tail = 0,
     _is_flushing = false,
     _dispatch_list = nil,
-  }, Trigger)
+  }, methods)
   return self
 end
 
+---@generic T
+---@param subs Spoke.TriggerSubscription<T>[]
+---@param dead_count integer
+---@return Spoke.TriggerSubscription<T>[]
+---@return integer
 local function compact(subs, dead_count)
   if dead_count * 2 <= #subs then
     return subs, dead_count
@@ -37,7 +75,9 @@ local function compact(subs, dead_count)
   return subs, 0
 end
 
-function Trigger:_subscribe(fn)
+---@param fn fun(value: any)
+---@return Spoke.SpokeHandle
+function methods:_subscribe(fn)
   if type(fn) ~= "function" then
     error("Trigger.subscribe expects a function", 2)
   end
@@ -53,16 +93,18 @@ function Trigger:_subscribe(fn)
   end)
 end
 
-function Trigger:subscribe(fn)
+function methods:subscribe(fn)
   return self:_subscribe(fn)
 end
 
-function Trigger:_unsub_by_id(id)
+---@param id integer
+function methods:_unsub_by_id(id)
   local subs = self._subs
   local lo, hi = 1, #subs
   while lo <= hi do
     local mid = math.floor((lo + hi) / 2)
     local sub = subs[mid]
+    ---@cast sub -nil
     if sub.id < id then
       lo = mid + 1
     elseif sub.id > id then
@@ -78,7 +120,8 @@ function Trigger:_unsub_by_id(id)
   end
 end
 
-function Trigger:_unsub_by_fn(fn)
+---@param fn fun(value: any)
+function methods:_unsub_by_fn(fn)
   local ids = {}
   for _, sub in ipairs(self._subs) do
     if sub.fn == fn then
@@ -90,18 +133,19 @@ function Trigger:_unsub_by_fn(fn)
   end
 end
 
-function Trigger:unsubscribe(fn)
+function methods:unsubscribe(fn)
   if type(fn) ~= "function" then
     error("Trigger.unsubscribe expects a function", 2)
   end
   self:_unsub_by_fn(fn)
 end
 
-local function reset_dispatch_list(trigger)
-  local list = trigger._dispatch_list
+---@return (fun(value: any))[]
+function methods:_reset_dispatch_list()
+  local list = self._dispatch_list
   if list == nil then
     list = {}
-    trigger._dispatch_list = list
+    self._dispatch_list = list
     return list
   end
   for index = 1, #list do
@@ -110,6 +154,8 @@ local function reset_dispatch_list(trigger)
   return list
 end
 
+---@param fn fun(value: any)
+---@param payload any
 local function invoke_subscriber(fn, payload)
   local ok, err = pcall(function()
     fn(payload)
@@ -119,19 +165,20 @@ local function invoke_subscriber(fn, payload)
   end
 end
 
-function Trigger:_dispatch(payload)
-  local dispatch_list = reset_dispatch_list(self)
+---@param payload any
+function methods:_dispatch(payload)
+  local dispatch_list = self:_reset_dispatch_list()
   for _, sub in ipairs(self._subs) do
-    dispatch_list[#dispatch_list + 1] = sub.fn
+    if sub.fn ~= nil then
+      dispatch_list[#dispatch_list + 1] = sub.fn
+    end
   end
   for _, fn in ipairs(dispatch_list) do
-    if fn ~= nil then
-      invoke_subscriber(fn, payload)
-    end
+    invoke_subscriber(fn, payload)
   end
 end
 
-function Trigger:_flush()
+function methods:_flush()
   if self._is_flushing then
     return
   end
@@ -151,7 +198,7 @@ function Trigger:_flush()
   end
 end
 
-function Trigger:invoke(payload)
+function methods:invoke(payload)
   local events = self._events
   self._event_tail = self._event_tail + 1
   events[self._event_tail] = payload

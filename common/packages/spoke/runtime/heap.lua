@@ -1,6 +1,23 @@
-local Heap = {}
-Heap.__index = Heap
+---@class Spoke.Heap<T>
+---@field count fun(self: Spoke.Heap<T>): integer
+---@field insert fun(self: Spoke.Heap<T>, value: T)
+---@field peek_min fun(self: Spoke.Heap<T>): T
+---@field remove_min fun(self: Spoke.Heap<T>): T
+---@field clear fun(self: Spoke.Heap<T>)
+---@field rebuild fun(self: Spoke.Heap<T>)
 
+---@class Spoke.HeapClass
+local Heap = {}
+
+---@class Spoke.HeapImpl: Spoke.Heap<any>
+---@field private _values any[]
+---@field private _compare fun(a: any, b: any): integer
+local methods = Heap --[[@as table]]
+methods.__index = methods
+
+---@generic T
+---@param compare fun(a: T, b: T): integer
+---@return Spoke.Heap<T>
 function Heap.new(compare)
   if type(compare) ~= "function" then
     error("Heap.new expects a comparison function", 2)
@@ -8,18 +25,15 @@ function Heap.new(compare)
   return setmetatable({
     _values = {},
     _compare = compare,
-  }, Heap)
+  }, methods)
 end
 
-function Heap:count()
+function methods:count()
   return #self._values
 end
 
-function Heap:_swap(a, b)
-  self._values[a], self._values[b] = self._values[b], self._values[a]
-end
-
-function Heap:_heapify_up(index)
+---@param index integer
+function methods:_heapify_up(index)
   local value = self._values[index]
   while index > 1 do
     local parent = math.floor(index / 2)
@@ -32,7 +46,8 @@ function Heap:_heapify_up(index)
   self._values[index] = value
 end
 
-function Heap:_heapify_down(index)
+---@param index integer
+function methods:_heapify_down(index)
   local values = self._values
   local count = #values
   while true do
@@ -53,20 +68,20 @@ function Heap:_heapify_down(index)
   end
 end
 
-function Heap:insert(value)
+function methods:insert(value)
   local values = self._values
   values[#values + 1] = value
   self:_heapify_up(#values)
 end
 
-function Heap:peek_min()
+function methods:peek_min()
   if #self._values == 0 then
     error("Heap is empty", 2)
   end
   return self._values[1]
 end
 
-function Heap:remove_min()
+function methods:remove_min()
   local values = self._values
   local count = #values
   if count == 0 then
@@ -83,11 +98,11 @@ function Heap:remove_min()
   return minimum
 end
 
-function Heap:clear()
+function methods:clear()
   self._values = {}
 end
 
-function Heap:rebuild()
+function methods:rebuild()
   for index = math.floor(#self._values / 2), 1, -1 do
     self:_heapify_down(index)
   end
