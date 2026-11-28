@@ -1,5 +1,15 @@
+---@class Spoke.Logger
+---@field log fun(self: Spoke.Logger, message: any)
+---@field error fun(self: Spoke.Logger, message: any)
+
+---@class Spoke.SpokeError
+---@field log fun(message: any, cause?: any)
+---@field default_logger Spoke.Logger
 local SpokeError = {}
 
+---@param message any
+---@param cause? any
+---@return string
 local function render(message, cause)
   local text = tostring(message)
   if cause ~= nil then
@@ -8,6 +18,8 @@ local function render(message, cause)
   return text
 end
 
+---@param message any
+---@param cause? any
 SpokeError.log = function(message, cause)
   if type(print) == "function" then
     local capture = type(debug) == "table" and debug.traceback or traceback
@@ -16,6 +28,7 @@ SpokeError.log = function(message, cause)
   end
 end
 
+---@type Spoke.Logger
 SpokeError.default_logger = {
   log = function(_, message)
     SpokeError.log(message)

@@ -2,12 +2,20 @@ local SpokeException = require("common.packages.spoke.runtime.spoke_exception")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 local EpochBuilder = require("common.packages.spoke.runtime.epoch_builder")
 
+---@class Spoke.EpochFrame
 local EpochFrame = {}
 
+---@generic T
+---@param value T
+---@return T
 local function identity_error(value)
   return value
 end
 
+---@param epoch Spoke.Epoch
+---@param phase string
+---@param error_value any
+---@return Spoke.SpokeException
 function EpochFrame.wrap_fault(epoch, phase, error_value)
   if SpokeException.is(error_value) then
     return error_value
@@ -20,6 +28,12 @@ function EpochFrame.wrap_fault(epoch, phase, error_value)
     SpokeRuntime.snapshot_frames())
 end
 
+---@param epoch Spoke.EpochInternal
+---@param phase Spoke.FrameKind
+---@param body fun(builder: Spoke.EpochBuilder): any
+---@return boolean ok
+---@return any result
+---@return Spoke.FrameHandle frame
 function EpochFrame.run(epoch, phase, body)
   epoch._frame_depth = epoch._frame_depth + 1
   local frame = SpokeRuntime.push({
@@ -40,6 +54,9 @@ function EpochFrame.run(epoch, phase, body)
   return ok, result, frame
 end
 
+---@param epoch Spoke.EpochInternal
+---@param frame Spoke.FrameHandle
+---@return boolean
 function EpochFrame.settle_detach_request(epoch, frame)
   if not epoch._detach_requested then
     return false
@@ -51,6 +68,10 @@ function EpochFrame.settle_detach_request(epoch, frame)
   return true
 end
 
+---@param epoch Spoke.EpochInternal
+---@param phase string
+---@param frame Spoke.FrameHandle
+---@param error_value any
 function EpochFrame.fail(epoch, phase, frame, error_value)
   epoch.fault = EpochFrame.wrap_fault(epoch, phase, error_value)
   EpochFrame.settle_detach_request(epoch, frame)

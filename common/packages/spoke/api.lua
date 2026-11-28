@@ -13,6 +13,20 @@ local Memo = require("common.packages.spoke.reactive.memo")
 local Phase = require("common.packages.spoke.reactive.phase")
 local EffectBuilder = require("common.packages.spoke.reactive.effect_builder")
 
+---@class Spoke.API
+---@field Epoch Spoke.EpochClass
+---@field Ticker Spoke.TickerClass
+---@field SpokeTree Spoke.SpokeTreeClass
+---@field Dock Spoke.DockClass
+---@field LambdaEpoch Spoke.LambdaEpochClass
+---@field SpokeHandle Spoke.SpokeHandleClass
+---@field Trigger Spoke.TriggerClass
+---@field State Spoke.StateClass
+---@field Effect Spoke.EffectClass
+---@field Reaction Spoke.ReactionClass
+---@field Memo Spoke.MemoClass
+---@field Phase Spoke.PhaseClass
+---@field EffectBuilder Spoke.EffectBuilderClass
 return {
   Epoch = Epoch,
   Ticker = Ticker,

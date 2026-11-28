@@ -3,41 +3,79 @@ local EpochClass = require("common.packages.spoke.runtime.epoch_class")
 local Heap = require("common.packages.spoke.runtime.heap")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
 
+---@class Spoke.TickerClass
 local Ticker = {}
-Ticker.__index = Ticker
-Ticker.__tostring = Epoch.__tostring
-Ticker._default_name = "Ticker"
-Ticker.is_ticker = true
-Ticker.auto_arm_tick_after_init = false
+
+---@class Spoke.Ticker: Spoke.Epoch
+local methods = Ticker --[[@as table]]
+methods.__index = methods
+
+---@class Spoke.TickerInternal: Spoke.Ticker, Spoke.EpochInternal
+---@field _pending Spoke.Heap<Spoke.EpochInternal>?
+---@field _on_tick (fun(context: Spoke.TickContext))[]
+---@field _paused boolean
+---@field _is_ticking boolean
+---@field _in_on_tick boolean
+---@field _did_continue boolean
+---@field _last_ticked Spoke.EpochInternal?
+---@field _pass_count integer
+---@field _max_passes integer
+---@field _guard_entry integer
+---@field _bootstrap_active boolean
+local internal = Ticker --[[@as table]]
+internal.__tostring = Epoch.__tostring
+internal._default_name = "Ticker"
+internal.is_ticker = true
+internal.auto_arm_tick_after_init = false
 setmetatable(Ticker, { __index = Epoch })
 
+---@class Spoke.TickerBuilder
+---@field private _builder Spoke.EpochBuilder
+---@field private _ticker Spoke.TickerInternal
 local TickerBuilder = {}
 TickerBuilder.__index = TickerBuilder
 
+---@class Spoke.TickerPorts
+---@field private _ticker Spoke.Ticker
 local TickerPorts = {}
 TickerPorts.__index = TickerPorts
 
+---@class Spoke.TickContext
+---@field private _ticker Spoke.Ticker
 local TickContext = {}
 TickContext.__index = TickContext
 
 local DEFAULT_MAX_PASSES = 1000
 
+---@generic T
+---@param value T
+---@return T
 local function identity(value)
   return value
 end
 
+---@param name string
+---@param definition? Spoke.EpochDefinition
+---@return table
 function Ticker.extend(name, definition)
   return EpochClass.define(Ticker, name, definition, Epoch.__tostring)
 end
 
+---@param ... any
+---@return Spoke.Ticker
 function Ticker.new(...)
   return EpochClass.new_instance(Ticker, ...)
 end
 
-function Ticker:bootstrap()
+---@param s Spoke.TickerBuilder
+---@return Spoke.Epoch
+---@diagnostic disable-next-line: unused
+function methods:bootstrap(s)
+  local _ = s
   error("Ticker subclasses must implement bootstrap", 2)
 end
 
+---@param ticker Spoke.TickerInternal
 local function run_on_tick_callbacks(ticker)
   for _, callback in ipairs(ticker._on_tick) do
     if not ticker._paused then
@@ -46,24 +84,29 @@ local function run_on_tick_callbacks(ticker)
   end
 end
 
+---@param ticker Spoke.TickerInternal
 local function assert_pass_advanced(ticker)
   if not ticker._did_continue and not ticker._paused then
     error("Ticker must tick_next() or pause() during on_tick")
   end
 end
 
+---@param ticker Spoke.TickerInternal
 local function request_next_pass(ticker)
   if ticker:has_pending() and not ticker._paused then
     ticker:_request_upstream()
   end
 end
 
+---@param ticker Spoke.TickerInternal
 local function run_on_tick_pass(ticker)
   run_on_tick_callbacks(ticker)
   assert_pass_advanced(ticker)
   request_next_pass(ticker)
 end
 
+---@param ticker Spoke.TickerInternal
+---@return Spoke.EpochTickFn
 local function make_tick_block(ticker)
   return function()
     if ticker._paused or not ticker:has_pending() then
@@ -79,44 +122,48 @@ local function make_tick_block(ticker)
   end
 end
 
-function Ticker:init(builder)
-  self._pending = Heap.new(function(a, b)
+---@param builder Spoke.EpochBuilder
+---@return Spoke.EpochTickFn
+function methods:init(builder)
+  local this = self --[[@as Spoke.TickerInternal]]
+  this._pending = Heap.new(function(a, b)
     return a:compare_to(b)
   end)
-  self._on_tick = {}
-  self._paused = false
-  self._is_ticking = false
-  self._in_on_tick = false
-  self._last_ticked = nil
-  self._pass_count = 0
-  self._max_passes = DEFAULT_MAX_PASSES
-  self._guard_entry = -1
-  self._bootstrap_active = true
+  this._on_tick = {}
+  this._paused = false
+  this._is_ticking = false
+  this._in_on_tick = false
+  this._last_ticked = nil
+  this._pass_count = 0
+  this._max_passes = DEFAULT_MAX_PASSES
+  this._guard_entry = -1
+  this._bootstrap_active = true
   local ticker_builder = setmetatable({
     _builder = builder,
-    _ticker = self,
+    _ticker = this,
   }, TickerBuilder)
   local ok, root = xpcall(function()
-    return self:bootstrap(ticker_builder)
+    return this:bootstrap(ticker_builder)
   end, identity)
-  self._bootstrap_active = false
+  this._bootstrap_active = false
   if not ok then
     error(root, 0)
   end
-  if type(root) ~= "table" or type(root._attach) ~= "function" then
+  if type(root) ~= "table" or type((root --[[@as Spoke.EpochInternal]])._attach) ~= "function" then
     error("Ticker bootstrap must return an unattached Epoch", 2)
   end
   builder:call(root)
 
-  return make_tick_block(self)
+  return make_tick_block(this)
 end
 
-function Ticker:_request_upstream()
+function internal:_request_upstream()
   if self._is_manual then
     return
   end
   local request = function()
     if self._is_tree then
+      ---@cast self Spoke.SpokeTreeInternal
       SpokeRuntime.schedule(self)
     elseif self._request_tick then
       self._request_tick()
@@ -130,35 +177,47 @@ function Ticker:_request_upstream()
   end
 end
 
+---@param node Spoke.Epoch
+---@return boolean
 local function is_live(node)
   return not (node.is_detached or node.fault)
 end
 
+---@param ticker Spoke.TickerInternal
+---@param had_pending boolean
+---@return boolean
 local function should_request_upstream(ticker, had_pending)
   return not ticker._is_ticking
     and not had_pending
     and not ticker._paused
 end
 
-function Ticker:_schedule(epoch)
+---@param epoch Spoke.EpochInternal
+function internal:_schedule(epoch)
   if not (is_live(self) and is_live(epoch)) then
     return
   end
+  local pending = self._pending
+  if not pending then
+    return
+  end
   local had_pending = self:has_pending()
-  self._pending:insert(epoch)
+  pending:insert(epoch)
   if should_request_upstream(self, had_pending) then
     self:_request_upstream()
   end
 end
 
-function Ticker:has_pending()
-  if not self._pending then
+---@return boolean
+function methods:has_pending()
+  local pending = (self --[[@as Spoke.TickerInternal]])._pending
+  if not pending then
     return false
   end
-  while self._pending:count() > 0 do
-    local epoch = self._pending:peek_min()
+  while pending:count() > 0 do
+    local epoch = pending:peek_min()
     if epoch.is_detached or epoch.fault then
-      self._pending:remove_min()
+      pending:remove_min()
     else
       return true
     end
@@ -166,18 +225,26 @@ function Ticker:has_pending()
   return false
 end
 
-function Ticker:peek_next()
+---@return Spoke.Epoch?
+function methods:peek_next()
   if not self:has_pending() then
     return nil
   end
-  return self._pending:peek_min()
+  local pending = (self --[[@as Spoke.TickerInternal]])._pending
+  if not pending then
+    return nil
+  end
+  return pending:peek_min()
 end
 
+---@param ticker Spoke.TickerInternal
 local function reset_loop_guard(ticker)
   ticker._last_ticked = nil
   ticker._pass_count = 0
 end
 
+---@param ticker Spoke.TickerInternal
+---@param next_epoch Spoke.EpochInternal
 local function check_loop_guard(ticker, next_epoch)
   local entry = SpokeRuntime._entry_count
   if entry ~= ticker._guard_entry then
@@ -202,46 +269,52 @@ local function check_loop_guard(ticker, next_epoch)
   end
 end
 
-function Ticker:tick_next()
-  if not self._in_on_tick then
+---@return Spoke.Epoch
+function methods:tick_next()
+  local this = self --[[@as Spoke.TickerInternal]]
+  if not this._in_on_tick then
     error("tick_next() must be called from within an on_tick block", 2)
   end
-  if not self:has_pending() then
+  local pending = this._pending
+  if not pending or not this:has_pending() then
     error("Ticker has no pending epochs", 2)
   end
-  self._did_continue = true
-  check_loop_guard(self, self._pending:peek_min())
-  local epoch = self._pending:remove_min()
+  this._did_continue = true
+  check_loop_guard(this, pending:peek_min())
+  local epoch = pending:remove_min()
   epoch:_tick()
-  if not self:has_pending() then
-    reset_loop_guard(self)
+  if not this:has_pending() then
+    reset_loop_guard(this)
   end
   return epoch
 end
 
-function Ticker:pause()
-  if self._paused then
+function methods:pause()
+  local this = self --[[@as Spoke.TickerInternal]]
+  if this._paused then
     return
   end
-  self._paused = true
+  this._paused = true
 end
 
-function Ticker:resume()
-  if not self._paused then
+function methods:resume()
+  local this = self --[[@as Spoke.TickerInternal]]
+  if not this._paused then
     return
   end
-  self._paused = false
-  if self:has_pending() and not self._is_ticking then
-    self:_request_upstream()
+  this._paused = false
+  if this:has_pending() and not this._is_ticking then
+    this:_request_upstream()
   end
 end
 
-function Ticker:_discard_pending()
-  if not self._pending then
+function internal:_discard_pending()
+  local pending = self._pending
+  if not pending then
     return
   end
-  while self._pending:count() > 0 do
-    local epoch = self._pending:remove_min()
+  while pending:count() > 0 do
+    local epoch = pending:remove_min()
     epoch._is_pending = false
     if type(epoch._discard_pending) == "function" then
       epoch:_discard_pending()
@@ -249,7 +322,7 @@ function Ticker:_discard_pending()
   end
 end
 
-function Ticker:_clear_pending()
+function internal:_clear_pending()
   self:_discard_pending()
 end
 
@@ -262,6 +335,7 @@ function TickerBuilder:_assert_bootstrap()
   end
 end
 
+---@param fn fun(context: Spoke.TickContext)
 function TickerBuilder:on_tick(fn)
   self:_assert_bootstrap()
   if type(fn) ~= "function" then
@@ -270,47 +344,68 @@ function TickerBuilder:on_tick(fn)
   self._ticker._on_tick[#self._ticker._on_tick + 1] = fn
 end
 
+---@param max_passes integer
 function TickerBuilder:loop_guard(max_passes)
   self:_assert_bootstrap()
   self._ticker._max_passes = max_passes
 end
 
+---@return Spoke.TickerPorts
 function TickerBuilder:ports()
   return setmetatable({ _ticker = self._ticker }, TickerPorts)
 end
 
+---@generic T: Spoke.Disposable
+---@param resource T
+---@return T
 function TickerBuilder:use(resource)
   return self._builder:use(resource)
 end
 
+---@generic T: Spoke.Epoch
+---@param epoch T
+---@return T
 function TickerBuilder:call(epoch)
   return self._builder:call(epoch)
 end
 
+---@generic T
+---@param key string
+---@param value T
+---@return T
 function TickerBuilder:export(key, value)
   return self._builder:export(key, value)
 end
 
+---@param key string
+---@return any
 function TickerBuilder:import(key)
   return self._builder:import(key)
 end
 
+---@param key string
+---@return boolean found
+---@return any value
 function TickerBuilder:try_import(key)
   return self._builder:try_import(key)
 end
 
+---@param fn fun()
 function TickerBuilder:on_cleanup(fn)
-  return self._builder:on_cleanup(fn)
+  self._builder:on_cleanup(fn)
 end
 
+---@param message any
 function TickerBuilder:log(message)
-  return self._builder:log(message)
+  self._builder:log(message)
 end
 
+---@return boolean
 function TickerPorts:has_pending()
   return self._ticker:has_pending()
 end
 
+---@return Spoke.Epoch?
 function TickerPorts:peek_next()
   return self._ticker:peek_next()
 end
@@ -323,6 +418,7 @@ function TickerPorts:resume()
   self._ticker:resume()
 end
 
+---@return Spoke.Epoch
 function TickContext:tick_next()
   return self._ticker:tick_next()
 end
