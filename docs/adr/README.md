@@ -22,7 +22,7 @@
 
 ## 工具链与平台边界
 - [0017](0017-windows-native-only.md) — 改动 `tools/` CLI、子进程、路径或测试夹具：Windows 原生单一环境与唯一接缝 `tools/seam.lua`。
-- [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：`editor-unit` 在 0.20.17 恢复为首选读取面、`exec` 合同降为兜底；故障与四条硬边界作历史保留。
+- [0035](0035-editor-sdk-enumeration-broken-and-exec-bypass.md) — 用 `editor-cli` 读写场景或写引擎替身：`editor-unit` 首选只读，批量采集与写操作走 `exec` 三条硬边界。
 - [0036](0036-platform-commerce-and-ads-not-verifiable-in-editor.md) — 改动商城、支付或广告适配层：编辑器内不可验收、订单身份自研与超时兜底。
 - [0038](0038-emmylua-agentic-coding-quality-gate.md) — 改动 Lua 诊断门禁、`.emmyrc.json` 或基线：EmmyLua 作为诊断质量门禁与单向基线。
 - [0040](0040-local-multiplayer-not-simulatable-in-editor.md) — （已被 0044 取代）早期仅查 CLI 与公开文档得出的「本地模拟多人不可用」历史结论。

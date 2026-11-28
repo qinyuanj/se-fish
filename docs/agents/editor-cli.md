@@ -15,7 +15,7 @@
 - **风险步逐次确认**：推送、场景写入单独取得用户确认，一次授权只覆盖它点名的那一轮或那一批；不经 `deploy` 的手工 `code push` 算推送。部署（含随行 validate → `code push` → `code diff`）、试玩（起停、`input`、截图取证）、地图保存与重开都不需要授权，直接执行，照「测试纪律」留证据。场景写入以 `APPLY = true` 跑探针：先 `APPLY = false` dry-run 交用户，确认一批执行一批，执行完改回 `APPLY = false`。
 - **场景整理顺序**：空目录清理排在全部建标记批次之后，只处理基线回读时已存在的空目录。删除或挪动场景地面前，先在试玩服务端对受影响区打向下射线，确认其下仍有地面。
 - **编辑态读不到的设置**：编辑态 `editor:GetService('PhysicsService')` 为 nil，地面高度只能在试玩服务端用射线测；编辑态读 World 的 `AOIType`、`StreamingEnabled` 得到 nil，流式加载设置无法经 CLI 确认。
-- **场景枚举**：编辑器侧执行 [ADR-0035](../adr/0035-editor-sdk-enumeration-broken-and-exec-bypass.md) 的四条硬边界（绕过合同），试玩服务端的例外也写在那里。
+- **场景枚举（`exec` 硬边界）**：走 `exec` 采集或写场景时遵守 [ADR-0035](../adr/0035-editor-sdk-enumeration-broken-and-exec-bypass.md) 的三条硬边界（不用 `World:GetChildren` / 编辑态 `World:GetDescendants`，不按类型枚举 `Script` / `PresetLink`，`Unit:FindFirstChild` 不递归），试玩服务端的例外也写在那里。
 - **`editor-unit` 已恢复（0.20.17 实测）**：`capabilities --json` 报 `success: true`、`backend: se_editor_api`、`data.available` / `fully_aligned` 均为 `true`，13 个操作全部 `supported`（`list` 默认 50 / 上限 200，`unit_id_scope: current_map_load`）；`list --json`、`get <unit-id> --json`（`WorldUnit`）、`get-property <unit-id> <attr> --json`（`Folder` 的 `name` 读回 string）实测可用。按 ID 的**读**改回 `editor-unit` 首选，`exec` 降为兜底；写操作（`set-property` / `transform` / `create` / …）本次未实跑，仍按 [ADR-0035](../adr/0035-editor-sdk-enumeration-broken-and-exec-bypass.md) 走 `exec`。UnitId 只在当前地图装载内有效。
 - **检索失败**：`docs search` 报 HTTP 500 等服务端错误时（0.20.12 的 `editor-api` docset 出现过），改查 `manual` 或编辑器在线时的 `api search-editor` / `api get-editor`。
 - **检索范围**：本图是世界版（SE，`status --json` 的 `editor_mode: "se"`）。`docs search` 查不到问题里的词时先问用户指什么，等确认后再换库或换方向，不自行换库；原点版（FS）的库只在用户点名「原点版 / FS」时才查。
