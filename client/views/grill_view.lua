@@ -4,6 +4,7 @@ local GameCfg = require("common.game_cfg")
 local GrillCurve = require("common.grill_curve")
 local Spoke = require("common.packages.spoke.api")
 local ViewUtil = require("client.views.view_util")
+local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local State = Spoke.State
 
@@ -306,10 +307,12 @@ function GrillView.bubble_spec(options)
       local radius_sq = radius * radius
       for index, entry in ipairs(options.anchors or {}) do
         local dist_sq = ViewUtil.distance_sq_xz(position, entry.position)
-        if dist_sq ~= nil and dist_sq <= radius_sq then
+        local aname = entry.name or (entry.point and entry.point.AnchorName) or ("Grill_" .. tostring(index))
+        if dist_sq ~= nil and dist_sq <= radius_sq
+            and InteractPromptArbiter.is_exclusive(position, character, aname, entry.position) then
           list[#list + 1] = {
             index = entry.index or index,
-            name = entry.name or (entry.point and entry.point.AnchorName) or ("Grill_" .. tostring(index)),
+            name = aname,
             position = entry.position,
           }
         end

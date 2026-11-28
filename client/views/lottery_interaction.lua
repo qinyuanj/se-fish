@@ -2,6 +2,7 @@ local GameCfg = require("common.game_cfg")
 local BodyScale = require("common.body_scale")
 local Modal = require("client.views.economy_modal")
 local ViewUtil = require("client.views.view_util")
+local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 
 local LotteryInteraction = {}
 
@@ -53,7 +54,9 @@ function LotteryBehavior.update(self, stored_pos, stored_character)
   local near_machine = nil
   for _, bubble in ipairs(self.bubbles) do
     local dist_sq = pos ~= nil and ViewUtil.distance_sq_xz(pos, bubble.center) or nil
+    local aname = bubble.anchor and bubble.anchor.Name or nil
     local near = dist_sq ~= nil and dist_sq <= radius_sq
+      and InteractPromptArbiter.is_exclusive(pos, current, aname, bubble.center)
     if near then near_machine = bubble end
     if bubble.near ~= near then
       bubble.near = near

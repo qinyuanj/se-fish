@@ -264,7 +264,7 @@ function GrillBehavior.request_start(self, payload)
   if env.tree.memos.can_act:now() ~= true then
     return fail(remote, player, "not-alive", seq)
   end
-  local anchor_name, anchor = anchor_in_range(player, session.world, session.anchors)
+  local anchor_name, anchor = anchor_in_range(player, session.anchors)
   if not anchor_name then return fail(remote, player, "out-of-range", seq) end
   local slot, entry = selected_entry(data)
   if not grillable(entry) then return fail(remote, player, "no-fish", seq) end
@@ -336,7 +336,7 @@ function GrillBehavior.request_takeout(self, payload)
   if env.tree.memos.can_act:now() ~= true then
     return fail(remote, player, "not-alive", seq)
   end
-  if not anchor_in_range(player, session.world, session.anchors) then
+  if not anchor_in_range(player, session.anchors) then
     return fail(remote, player, "out-of-range", seq)
   end
   local now = env.clock.now()

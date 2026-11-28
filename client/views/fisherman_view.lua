@@ -3,6 +3,7 @@ local BodyScale = require("common.body_scale")
 local Dialogue = require("common.npc_dialogue")
 local Spoke = require("common.packages.spoke.api")
 local ViewUtil = require("client.views.view_util")
+local InteractPromptArbiter = require("client.views.interact_prompt_arbiter")
 local RescueView = require("client.views.rescue_view")
 local Modal = require("client.views.economy_modal")
 
@@ -26,7 +27,10 @@ function FishermanView.bubble_spec(options)
       local character = es:d(store.local_character)
       local list = {}
       for _, entry in ipairs(options.anchors or {}) do
-        if entry.npc and near(position, entry.position, character) then list[#list + 1] = entry end
+        if entry.npc and near(position, entry.position, character)
+            and InteractPromptArbiter.is_exclusive(position, character, entry.name, entry.position) then
+          list[#list + 1] = entry
+        end
       end
       return list
     end,

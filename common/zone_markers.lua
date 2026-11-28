@@ -2,7 +2,14 @@ local GameCfg = require('common.game_cfg')
 local SceneGeometry = require('common.cfg.scene_geometry')
 local SceneWaterGeometry = require('common.cfg.scene_water_geometry')
 
-local ZoneMarkers = { ready = false, Zones = {}, anchor_positions = {} }
+local ZoneMarkers = {
+    ---@type boolean
+    ready = false,
+    ---@type table<string, any>
+    Zones = {},
+    ---@type table<string, any>
+    anchor_positions = {},
+}
 
 local zoneNames = { '01 鱼塘', '02 虾池', '03 蟹湖', '04 树林岛', '05 沙滩岛', '06 礁石岛', '07 火山岛' }
 

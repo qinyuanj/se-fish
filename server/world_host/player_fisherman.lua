@@ -20,6 +20,7 @@ local function fisherman_point(shared, npc)
   local point = {}
   for key, value in pairs(shared) do point[key] = value end
   point.ZoneId, point.AnchorNames = npc.ZoneId, npc.AnchorNames
+  point.ModelName = npc.ModelName
   point.Exchange, point.Chain = npc.Exchange, npc.Chain
   return point
 end
@@ -94,12 +95,16 @@ local function deliver(target, exchange, product)
   return true
 end
 
---- 吃动作播放：仅日志兜底，不读 mount 的 upvalue（拆分前 mount 体内的 play_eat）。
-local function play_eat(anchor, point)
-  if not point.EatAnimation then return end
-  local ok_read, play = pcall(function() return anchor.PlayAnimation end)
-  if not ok_read or not play then return end
-  local ok, err = pcall(play, anchor, point.EatAnimation)
+--- 吃动作播放：只在非静态的钓鱼佬外观上播放（#407 / #410）。
+--- 锚点标记已开启静态优化，游戏内不再创建完整 Unit，不能拿锚点当动画宿主；
+--- 仅日志兜底，不读 mount 的 upvalue（拆分前 mount 体内的 play_eat）。
+local function play_eat(point)
+  if not point.EatAnimation or not point.ModelName then return end
+  local ok_world, world = pcall(function() return game:GetService("World") end)
+  if not ok_world or not world or type(world.FindFirstChild) ~= "function" then return end
+  local unit = world:FindFirstChild(point.ModelName, true) ---@cast unit any
+  if not unit then return end
+  local ok, err = pcall(unit.PlayAnimation, unit, point.EatAnimation)
   if not ok then print("[PlayerFisherman] 吃动作播放失败", tostring(err)) end
 end
 
@@ -118,7 +123,7 @@ FishermanBehavior.resolve = PlayerBehaviorKit.resolve_fn(FishermanBehavior, {
 })
 
 --- 信物兑换（拆分前 mount 体内的 exchange）。
-function FishermanBehavior.exchange(self, operation, point, anchor, request)
+function FishermanBehavior.exchange(self, operation, point, request)
   local env = self.fisherman_env
   local player, data, save = env.player, env.data, env.save
   local product = product_of(request.product)
@@ -150,14 +155,14 @@ function FishermanBehavior.exchange(self, operation, point, anchor, request)
     result_value = result
     SpokeRuntime.batch(function() env.tree:sync_from_data(data) end)
     self:reply(result)
-    play_eat(anchor, point)
+    play_eat(point)
   end)
   if accepted ~= true then return false end
   return result_value ~= nil or true
 end
 
 --- 卖鱼与吃鱼（拆分前 mount 体内的 feed）。
-function FishermanBehavior.feed(self, operation, point, anchor)
+function FishermanBehavior.feed(self, operation, point)
   local env = self.fisherman_env
   local player, data, save, opts = env.player, env.data, env.save, env.opts
   local selected_slot, selected_bait = data.data.selected_slot, data.data.selected_bait
@@ -185,7 +190,7 @@ function FishermanBehavior.feed(self, operation, point, anchor)
     result_value = result
     SpokeRuntime.batch(function() env.tree:sync_from_data(data) end)
     self:reply(result)
-    play_eat(anchor, point)
+    play_eat(point)
     if opts.quest and opts.quest.record_fact then
       if opts.quest.refresh_committed then opts.quest:refresh_committed(player, data) end
     elseif opts.quest and opts.quest.notify then
@@ -213,11 +218,11 @@ function FishermanBehavior.handle(self, actor, payload)
     if seq <= env.last_seq then return false end
     env.last_seq = seq
   end
-  local point, anchor = resolve_fisherman(player)
+  local point = resolve_fisherman(player)
   if not point then return false end
   local request = exchangeable(data, point)
-  if request then return self:exchange(operation, point, anchor, request) end
-  return self:feed(operation, point, anchor)
+  if request then return self:exchange(operation, point, request) end
+  return self:feed(operation, point)
 end
 
 --- 装配渔夫交互实例：状态与依赖集中在 fisherman_env，方法由 FishermanBehavior 提供。
