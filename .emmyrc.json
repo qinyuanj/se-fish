@@ -3,10 +3,30 @@
   "runtime": {
     "version": "Lua5.4"
   },
+  "diagnostics": {
+    "disable": [
+      "unnecessary-if"
+    ],
+    "globals": [
+      "RemoteEvent"
+    ]
+  },
   "workspace": {
+    "library": [
+      "types"
+    ],
     "ignoreDir": [
       ".git", ".dsh", ".claude", ".agents", ".teamai",
-      "tmp", "target", ".toolcache", "evidence", "learn", "data", "docs", "tools", "packages", "_trigger"
+      "tmp", "target", ".toolcache", "evidence", "learn", "data", "docs", "tools",
+      "tests", "client/packages", "common/packages", "server/packages", "server/_trigger"
+    ],
+    "ignoreGlobs": [
+      "EggyEditorAPI.lua",
+      "tests/**",
+      "client/packages/**",
+      "common/packages/**",
+      "server/packages/**",
+      "**/_trigger/**"
     ]
   }
 }
