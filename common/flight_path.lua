@@ -101,7 +101,7 @@ local function clampToBounds(state)
     return clamped
 end
 
-local function driftLimit(state, dt)
+local function driftLimit(state, _dt)
     return M.speed(state) * state.cfg.MaxStepSec * 2 + state.cfg.DriftTolerance
 end
 
@@ -138,7 +138,7 @@ local function updateCruise(state, dt, now, events)
     return speed
 end
 
-local function updateDive(state, dt, now, events)
+local function updateDive(state, _dt, now, _events)
     local c = state.cfg
     local speed = state.profile.DiveSpeed or c.DiveSpeed
     local target = state.Target
@@ -159,7 +159,7 @@ local function updateDive(state, dt, now, events)
     return speed
 end
 
-local function updateClimb(state, dt, now, events)
+local function updateClimb(state, _dt, _now, _events)
     local speed = M.speed(state)
     local cruiseY = state.bounds.ground_y + M.CruiseHeight(state)
     state.vel.x, state.vel.z = 0, 0
@@ -171,10 +171,10 @@ local function updateClimb(state, dt, now, events)
     return speed
 end
 
-local function updateLeap(state, dt, now, events)
+local function updateLeap(state, _dt, now, _events)
     local c = state.cfg
     local apex = state.profile.LeapHeight or c.LeapHeight
-    local progress = 0
+    local progress = 0.0
     if state.phase_ends_at > state.phase_started_at then
         progress = (now - state.phase_started_at) / (state.phase_ends_at - state.phase_started_at)
     end

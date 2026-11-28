@@ -6,6 +6,17 @@ local GameCfg = require("common.game_cfg")
 local AbilityAPI = require("server.ability_api")
 local AbilityPackageAPI = require("server.packages.ability_system.api")
 
+---@class FishAbilityHost
+---@field SpokeHost boolean
+---@field pending_fish_cleanup table<any, any>
+---@field Modifier any
+---@field ai any
+---@field Vitals any
+---@field player_data any
+---@field pending_speed table<any, any>?
+---@field pending_growth table<any, any>?
+---@field behavior_services table?
+---@field attr any
 local FishAbility = { SpokeHost = true, pending_fish_cleanup = {} }
 
 local EQUIP_RETRY_INTERVAL = 0.1
@@ -230,7 +241,7 @@ end
 
 function FishAbility:start()
 	AbilityAPI.behavior_services = self.behavior_services
-	AbilityAPI.set_cast_guard(function(unit, index) return self:can_cast(unit) end)
+	AbilityAPI.set_cast_guard(function(unit, _index) return self:can_cast(unit) end)
 end
 
 function FishAbility:on_player_added(player)
@@ -247,7 +258,7 @@ function FishAbility:on_player_removing(player)
 	if self.pending_speed then self.pending_speed[player.UserId] = nil end
 end
 
-function FishAbility:update(deltaTime)
+function FishAbility:update(_deltaTime)
     for fish in pairs(self.pending_fish_cleanup) do self:remove_fish(fish) end
     local retrySpeed = {}
     for uid, player in pairs(self.pending_speed or {}) do retrySpeed[uid] = player end

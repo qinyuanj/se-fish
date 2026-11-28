@@ -114,10 +114,10 @@ end
 
 ---@param state table
 ---@param now number
----@param dt number
+---@param _dt number
 ---@param input table { Health, MaxHealth, Alive, Target, Pos? }
 ---@return table events { Phase, PhaseChanged?, From?, To?, Skipped?, Percent, Attack?, Interrupted?, Reason? }
-function M.update(state, now, dt, input)
+function M.update(state, now, _dt, input)
     now = now_(now)
     input = input or {}
     state.stats.frames = state.stats.frames + 1
@@ -149,20 +149,24 @@ function M.update(state, now, dt, input)
         local current = phaseIndex(state.cfg, state.Phase)
         if target > current then
             local list = chain(state.cfg)
-            local skipped = {}
-            for index = current + 1, target - 1 do
-                skipped[#skipped + 1] = list[index].Phase
+            local target_entry = list[target]
+            if target_entry then
+                local skipped = {}
+                for index = current + 1, target - 1 do
+                    local step = list[index]
+                    if step then skipped[#skipped + 1] = step.Phase end
+                end
+                events.phase_changed = true
+                events.From = state.Phase
+                events.to = target_entry.Phase
+                events.skipped = skipped
+                state.Phase = target_entry.Phase
+                state.stats.transitions = state.stats.transitions + 1
+                state.stats.skipped = state.stats.skipped + #skipped
+                state.Log[#state.Log + 1] = { at = now, Kind = 'phase', From = events.From,
+                    to = events.to, Percent = percent, skipped = skipped }
+                resetCooldowns(state, now)
             end
-            events.phase_changed = true
-            events.From = state.Phase
-            events.to = list[target].Phase
-            events.skipped = skipped
-            state.Phase = list[target].Phase
-            state.stats.transitions = state.stats.transitions + 1
-            state.stats.skipped = state.stats.skipped + #skipped
-            state.Log[#state.Log + 1] = { at = now, Kind = 'phase', From = events.From,
-                to = events.to, Percent = percent, skipped = skipped }
-            resetCooldowns(state, now)
         end
     end
     events.Phase = state.Phase

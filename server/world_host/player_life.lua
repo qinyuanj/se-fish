@@ -226,7 +226,7 @@ function LifeBehavior.publish(self)
   if mark then
     local now = clock.now()
     local pending = env.platform:now()
-    local paused = type(pending) == "table" and math.max(0, now - (pending.startedAt or now)) or 0
+    local paused = type(pending) == "table" and math.max(0.0, now - (pending.startedAt or now)) or 0.0
     local downed_at = env.downed_until:now()
     local dead_at = env.dead_until:now()
     mark.health = states.health:now()

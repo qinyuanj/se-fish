@@ -60,8 +60,9 @@ end
 ---@return table
 function ModifierLeaf.build_add_config(kind, duration, source)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  local max_stacks = (cfg and Number.is_finite_number(cfg.MaxStacks) and cfg.MaxStacks > 0)
-      and math.floor(cfg.MaxStacks) or 1
+  local raw_max = cfg and cfg.MaxStacks
+  local max_stacks = (raw_max ~= nil and Number.is_finite_number(raw_max) and raw_max > 0)
+      and math.floor(raw_max) or 1
   local stack_count_mode = max_stacks > 1 and 2 or 0
   return {
     duration = duration,
@@ -140,6 +141,7 @@ function ModifierLeaf.mount_slot(es, player_tree, kind, _entry, opts)
     return
   end
   opts = type(opts) == "table" and opts or {}
+  ---@type table
   local modifier_api = opts.modifier_api or default_modifier_api()
   local char_sig = player_tree.states and player_tree.states.character
   local mod_sig = player_tree.modifier_signals and player_tree.modifier_signals[kind]
@@ -245,16 +247,18 @@ end
 
 local function max_stacks_for(kind)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  if cfg and Number.is_finite_number(cfg.MaxStacks) and cfg.MaxStacks > 0 then
-    return math.floor(cfg.MaxStacks)
+  local raw_max = cfg and cfg.MaxStacks
+  if raw_max ~= nil and Number.is_finite_number(raw_max) and raw_max > 0 then
+    return math.floor(raw_max)
   end
   return 1
 end
 
+---@return { TickSec: number, DamagePerStack: number }?
 local function dot_cfg_for(kind)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
   if cfg and Number.is_finite_number(cfg.TickSec) and cfg.TickSec > 0 and Number.is_finite_number(cfg.DamagePerStack) then
-    return cfg
+    return cfg --[[@as { TickSec: number, DamagePerStack: number }]]
   end
   return nil
 end
@@ -511,6 +515,7 @@ end
 ---@param opts? table { modifier_api?: table, presets?: table, now?: function, on_dot_tick?: function, on_error?: function }
 function ModifierLeaf.create_entity_store(opts)
   opts = type(opts) == "table" and opts or {}
+  ---@type table
   local modifier_api = opts.modifier_api or default_modifier_api()
   if type(opts.now) ~= "function" then
     error("[ModifierLeaf] create_entity_store 需要注入有效的 now 时钟函数", 2)

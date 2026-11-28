@@ -2,6 +2,12 @@ local GameCfg = require('common.game_cfg')
 local QuestSteps = require('common.quest_steps')
 local SignalRouter = require('server.world_host.world_signal_router')
 
+---@class PlayerQuestHost
+---@field States table<any, any>
+---@field Players table<any, any>
+---@field queues table<any, any>
+---@field Save any
+---@field player_data any
 local Mgr = { States = {}, Players = {}, queues = {} }
 
 local function cfg()
@@ -178,7 +184,7 @@ function Mgr:drain(player)
         self.States[player.UserId] = restored
         local notice
         if result.advanced then
-            local nextStep = c.Steps[restored.step]
+            local nextStep = rawget(c.Steps, restored.step)
             notice = nextStep and string.format(c.NextNotice, nextStep.Text) or c.DoneText
         end
         print('[PlayerQuest] 任务落账', player.UserId, 'step=' .. restored.step,

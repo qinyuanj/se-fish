@@ -15,6 +15,7 @@ local function check_ledger(cfg, fail, activeGoods)
         Blindbox = { rows = cfg.Content.Blindbox.Entries, key = function(row) return row.number end },
     }
     for name, group in pairs(groups) do
+        ---@type table<any, any>
         local ledger = Ledger[name] or {}
         local seen = {}
         for _, row in pairs(group.rows) do

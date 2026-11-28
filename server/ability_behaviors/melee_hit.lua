@@ -101,7 +101,7 @@ local function _isSelf(unit, owner)
 	return false
 end
 
-local function _applyDamage(target, damage, owner, hit)
+local function _applyDamage(target, damage, _owner, hit)
 	if not damage or damage == 0.0 or not hit then
 		return false
 	end

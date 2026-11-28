@@ -54,7 +54,7 @@ function BlindboxDraw.draw(pity, rng)
     local index, entry
     if guaranteed then index, entry = rollGuaranteed(source)
     else index, entry = rollWeighted(source) end
-    if not index then return nil end
+    if not index or not entry then return nil end
     local jackpot = entry.jackpot == true
     return {
         index = index,

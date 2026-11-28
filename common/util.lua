@@ -9,7 +9,7 @@ function Util:wait_for_child(rootObj, childName, waitTime)
 		return 
 	end
 	if not waitTime then waitTime = 10 end
-	local costTime = 0
+	local costTime = 0.0
 	while rootObj and costTime < waitTime do
 		local childObj = rootObj:FindFirstChild(childName, rootObj == World)
 		if childObj then 
@@ -51,13 +51,6 @@ if RunService:IsClient() then
 	local LocalPlayer = Players.LocalPlayer
 	REUtil:get_re("MsgNoticeRE").OnClientEvent:Connect(function(msg, duration, textColor) 
 		Util:msg_notice(LocalPlayer, msg, duration, textColor)
-	end)
-end
-
-
-if RunService:IsServer() then
-	REUtil:get_re("GlobalMarquee").OnServerEvent:Connect(function(p, msg) 
-		Util:GlobalMarquee(msg)
 	end)
 end
 
@@ -107,7 +100,7 @@ function Util:design_number(value, keepNum)
 	if value < 0 then return tostring(value) end
 
 	local curNumInfo = nil
-	for i, info in ipairs(NumWithStrMap) do
+	for _, info in ipairs(NumWithStrMap) do
 		if value > info.Value then
 			curNumInfo = info
 		else

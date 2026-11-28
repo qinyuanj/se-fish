@@ -443,6 +443,7 @@ GameCfg.Compendium = { RefreshSec = 3, RootPollSec = 0.5, RequestCooldownSec = 0
 GameCfg.AchievementDelivery = { RetrySec = 15 }
 GameCfg.Shop.Catalog = ContentShop.Goods
 GameCfg.Shop.Excluded = ContentShop.Excluded
+---@type table<string, any>
 local LotteryCfg = {}
 for key, value in pairs(ContentLottery) do LotteryCfg[key] = value end
 GameCfg.Lottery = LotteryCfg
@@ -460,10 +461,12 @@ GameCfg.Lottery.ResultTimeoutSec = 5
 function GameCfg.Lottery.machine_anchors()
     local names = {}
     for _, zone in ipairs(GameCfg.Zones) do
+        ---@cast zone table<string, any>
         if zone.Scene and zone.Scene.lottery_name then names[#names + 1] = zone.Scene.lottery_name end
     end
     return names
 end
+---@type table<string, any>
 local BlindboxCfg = {}
 for key, value in pairs(ContentBlindbox) do BlindboxCfg[key] = value end
 GameCfg.Blindbox = BlindboxCfg
@@ -683,6 +686,7 @@ GameCfg.Casting.Zones['fishPond.water'] = GameCfg.Casting.Zones.WaterCircle2
 
 GameCfg.Casting.Zones['volcanoIsland.water'] = sourceCastRows.volcanoIsland
 for _, species in pairs(GameCfg.Fish) do
+    ---@cast species table<string, any>
     if species.ZoneId == 'volcanoIsland' then
         species.Model = '7000546'
         if species.Grade == 'elite' then species.Combat = 'mosasaur' end
@@ -945,9 +949,13 @@ GameCfg.Ferry.Routes = {}
 local ferryLegGeometry = { BoatRange = 6, Radius = 5, Slack = 0.5, BubbleHeight = 6 }
 local returnPrices = { 10, 30, 90, 270, 810, 2430 }
 for index = 1, 6 do
-    local from, to = GameCfg.Zones[index], GameCfg.Zones[index + 1]
+    local from = assert(GameCfg.Zones[index])
+    local to = assert(GameCfg.Zones[index + 1])
+    local exchange = assert(GameCfg.Content.Exchanges[index])
+    ---@type table<string, any>
     local outbound = { AnchorName = 'Z' .. index .. '_FerryOut',
-        Ticket = GameCfg.Content.Exchanges[index].Result, CountdownSec = 5, Zone = to.Id }
+        Ticket = exchange.Result, CountdownSec = 5, Zone = to.Id }
+    ---@type table<string, any>
     local back = { AnchorName = 'Z' .. (index + 1) .. '_FerryReturn',
         Price = returnPrices[index], Zone = from.Id }
     for key, value in pairs(ferryLegGeometry) do outbound[key], back[key] = value, value end
@@ -966,7 +974,7 @@ end
 
 GameCfg.Interact.Fishermen = {}
 for index, chain in ipairs(GameCfg.Content.Exchanges) do
-    local zone = GameCfg.Zones[index]
+    local zone = assert(GameCfg.Zones[index])
     local fishermanName = 'Z' .. index .. '_Fisherman'
     GameCfg.Interact.Fishermen[index] = {
         ZoneId = zone.Id, AnchorNames = { fishermanName },

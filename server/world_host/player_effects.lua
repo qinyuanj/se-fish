@@ -51,8 +51,9 @@ end
 
 local function max_stacks_of(kind)
   local cfg = GameCfg.Ability.StatusEffects and GameCfg.Ability.StatusEffects[kind]
-  if cfg and finite_positive(cfg.MaxStacks) then
-    return math.floor(cfg.MaxStacks)
+  local raw_max = cfg and cfg.MaxStacks
+  if raw_max ~= nil and finite_positive(raw_max) then
+    return math.floor(raw_max)
   end
   return 1
 end

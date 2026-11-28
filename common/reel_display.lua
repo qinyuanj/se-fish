@@ -1,3 +1,12 @@
+---@class ReelDisplay
+---@field cfg table
+---@field auth number
+---@field auth_at number
+---@field local_slot number
+---@field local_at number
+---@field unsent number
+---@field in_flight table[]
+---@field Chase { From: number, Start: number }?
 local ReelDisplay = {}
 ReelDisplay.__index = ReelDisplay
 

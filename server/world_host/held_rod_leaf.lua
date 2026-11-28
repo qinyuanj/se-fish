@@ -25,6 +25,7 @@ function HeldRodLeaf.resolve_visual_item_id(held, selected_slot, item_bar)
   end
   local entry = slot and type(item_bar) == "table" and item_bar[slot] or nil
   local item_id = type(entry) == "table" and (entry.count or 0) > 0 and entry.itemId or nil
+  ---@type table<string, any>?
   local item = item_id and GameCfg.Items.Definitions[item_id] or nil
   if not item or item.Type ~= "鱼竿" then
     item_id = type(held) == "table" and held.kind == "weapon" and held.id or nil
@@ -47,11 +48,13 @@ function HeldRodLeaf.create_visual(create_unit, user_id, character, item_id)
     return nil, nil, "invalid-args"
   end
 
+  ---@type table<string, any>?
   local item = GameCfg.Items.Definitions[item_id]
   if not item or not item.Visual or not item.Visual.Socket then
     return nil, nil, "no-visual"
   end
 
+  ---@type table<string, any>
   local cfg = item.Type == "鱼竿" and GameCfg.Items.RodVisual or item.Visual
   local uid = tostring(user_id)
 

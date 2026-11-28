@@ -14,7 +14,8 @@ function M.plan(input)
     input = input or {}
     local body = BodyScale.plan(input.bodyPotions)
     local speedCfg = GameCfg.Ability.SpeedPotion
-    local growth = math.min(speedCfg.MaxFactor, 1 + speedCfg.StepPercent / 100 * count(input.speedPotions, speedCfg.MaxPotions))
+    ---@type number
+    local growth = math.min(speedCfg.MaxFactor * 1.0, 1.0 + speedCfg.StepPercent / 100.0 * count(input.speedPotions, speedCfg.MaxPotions))
     local base = finite(input.baseSpeed) and input.baseSpeed > 0 and input.baseSpeed or GameCfg.Ability.MoveSpeed.Base
     local multiplier = finite(input.moveMultiplier) and math.max(0, math.min(1, input.moveMultiplier)) or 1
     local hunger = finite(input.hunger) and math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(input.hunger))) or GameCfg.Vitals.MaxHunger

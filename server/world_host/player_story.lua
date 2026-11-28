@@ -2,6 +2,12 @@ local EngineRead = require('common.engine_read')
 local GameCfg = require('common.game_cfg')
 local SignalRouter = require('server.world_host.world_signal_router')
 
+---@class PlayerStoryHost
+---@field States table<any, any>
+---@field requested table<any, any>
+---@field player_data any
+---@field Save any
+---@field service any
 local Mgr = { States = {}, requested = {} }
 local isValidPlayer = SignalRouter.is_valid_player
 

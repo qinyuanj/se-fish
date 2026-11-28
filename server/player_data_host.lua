@@ -1,6 +1,11 @@
 local PlayerData = require('server.data.player_data')
 local GameCfg = require('common.game_cfg')
 local Number = require('common.number')
+---@class PlayerDataHost
+---@field SpokeHost boolean
+---@field Vitals any
+---@field runtime any
+---@field Save any
 local PlayerDataHost = { SpokeHost = true }
 local DataMap = {}
 
@@ -218,7 +223,7 @@ local function eat_potion(target, slot, entry)
     return { ok = true, op = 'eat', held = false, itemId = entry.itemId, action = 'potion' }
 end
 
-local function eat_held(ctx, target, slot, entry)
+local function eat_held(_ctx, target, slot, entry)
     local definition = GameCfg.Items.Definitions[entry.itemId]
     if definition and definition.Type == '属性道具' then return eat_potion(target, slot, entry) end
     target:SelectSlot(slot)

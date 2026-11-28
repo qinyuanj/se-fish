@@ -74,7 +74,7 @@ function PlayerData:NoteSafePoint()
     self:ResolveSafePoint()
     local character = self.Player and self.Player.Character
     local position = character and character.Position
-    if insideBoundary(position, scene.Boundary) then
+    if position and insideBoundary(position, scene.Boundary) then
         self.extra.travel.safePoint = { x = position.x, y = position.y, z = position.z }
     end
 end
@@ -128,7 +128,9 @@ function PlayerData:Init(waitForLoad)
     if not self.Player or self.inited then return end
     if waitForLoad then self.load_state = 'pending' return end
     self.load_state = 'ready'
+    ---@type table[]
     local items = {}
+    ---@type table[]
     local backpack = {}
     local bait = {}
     local debug = GameCfg.Debug
@@ -807,6 +809,7 @@ function PlayerData:ConsumeItem(itemId)
         { GameCfg.Items.ContainerId.ItemBar, self:ItemBarCapacity() },
         { GameCfg.Items.ContainerId.Backpack, self:BackpackCapacity() },
     }) do
+        ---@type table<integer, any>
         local items = self.data.containers[container[1]]
         for index = 1, container[2] do
             local entry = items[index]
@@ -852,7 +855,7 @@ function PlayerData:EatSlot(index)
     local items = self.data.containers[GameCfg.Items.ContainerId.ItemBar]
     local entry = items[index]
     local definition = entry and entry.count > 0 and GameCfg.Items.Definitions[entry.itemId]
-    if not definition or type(definition.EatPercent) ~= 'number' then return nil end
+    if not entry or not definition or type(definition.EatPercent) ~= 'number' then return nil end
     self:UpdateData(function(data)
         data.containers[GameCfg.Items.ContainerId.ItemBar][index] = nil
     end, true)
@@ -887,6 +890,7 @@ function PlayerData:AddItem(itemId, mult, cooked)
         { GameCfg.Items.ContainerId.ItemBar, self:ItemBarCapacity() },
         { GameCfg.Items.ContainerId.Backpack, self:BackpackCapacity() },
     }) do
+        ---@type table<integer, any>
         local items = self.data.containers[container[1]]
         for index = 1, container[2] do
             local entry = items[index]
@@ -975,8 +979,8 @@ end
 
 function PlayerData:ExchangeSlot(slot, product)
     local items = self.inited and self.data.containers[GameCfg.Items.ContainerId.ItemBar]
-    local kept = type(slot) == 'number' and items and items[slot]
-    if not kept or kept.count <= 0 or type(product) ~= 'string' then return false, 'bad' end
+    local kept = type(slot) == 'number' and items and items[slot] or nil
+    if type(kept) ~= 'table' or kept.count <= 0 or type(product) ~= 'string' then return false, 'bad' end
     if not self:CanGrant(product, 1) then return false, 'full' end
     self:UpdateData(function(d)
         d.containers[GameCfg.Items.ContainerId.ItemBar][slot] = nil

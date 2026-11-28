@@ -20,7 +20,7 @@ end
 
 
 local AttackStep = 25
-local BaseAttack = 0
+local BaseAttack = 0.0
 for _, entry in ipairs(GameCfg.Ability.InitialAbilities) do
     if entry.AnchorBehavior == 'melee_hit' then
         BaseAttack = entry.AnchorAttributes.ABILITY_ANOSTATE_BULLET_DAMAGE

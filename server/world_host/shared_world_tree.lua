@@ -15,7 +15,23 @@ local Effect = Spoke.Effect
 
 local SharedWorldTree = {}
 
----@param opts { clock: table, zones?: table[], logger?: table, on_mount_zone?: fun(s: table, zone: table), on_mount_world?: fun(s: table, world: table) }
+---@class SharedWorldSpawnOpts
+---@field clock table
+---@field zones? table[]
+---@field logger? table
+---@field on_mount_zone? fun(s: table, zone: table)
+---@field on_mount_world? fun(s: table, world: table)
+---@field create_unit? fun(unit_type: string, props: table): any
+---@field remote? table
+---@field bait_spots? table
+---@field lookup_tree? fun(user_id: any): any
+---@field player_data? table
+---@field save? table
+---@field interact? table
+---@field players_service? any
+---@field session_epoch? any
+
+---@param opts SharedWorldSpawnOpts
 function SharedWorldTree.spawn(opts)
   if type(opts) ~= "table" then
     error("SharedWorldTree.spawn 需要参数表", 2)
@@ -32,6 +48,12 @@ function SharedWorldTree.spawn(opts)
 
   local zones = {}
   local zone_list = {}
+  ---@class SharedWorldHandle
+  ---@field clock table
+  ---@field zones table
+  ---@field zone_list table[]
+  ---@field squads any
+  ---@field tree SpokeTreeInstance?
   local handle = {
     clock = clock,
     zones = zones,
@@ -109,15 +131,15 @@ function SharedWorldTree.spawn(opts)
   end
 
   function handle:is_disposed()
-    return self.tree.is_detached == true
+    return self.tree ~= nil and self.tree.is_detached == true
   end
 
   function handle:is_faulted()
-    return self.tree.fault ~= nil
+    return self.tree ~= nil and self.tree.fault ~= nil
   end
 
   function handle:fault()
-    return self.tree.fault
+    return self.tree and self.tree.fault or nil
   end
 
   function handle:dispose()

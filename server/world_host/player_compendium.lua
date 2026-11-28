@@ -3,6 +3,15 @@ local FishCatch = require('common.fish_catch')
 local Records = require('common.records')
 local SignalRouter = require('server.world_host.world_signal_router')
 
+---@class PlayerCompendiumHost
+---@field queues table<any, any>
+---@field last_seq table<any, any>
+---@field KIND string
+---@field max_queue integer
+---@field player_data any
+---@field Save any
+---@field Quest any
+---@field Records any
 local Mgr = { queues = {}, last_seq = {}, KIND = 'compendium-land', max_queue = 16 }
 local isValidPlayer = SignalRouter.is_valid_player
 
@@ -24,13 +33,15 @@ end
 function Mgr:snapshot(player)
     local data = self.player_data and self.player_data:get_data_inst(player)
     local bag = data and data.extra and data.extra.collection or nil
-    if not bag or data.load_state ~= 'ready' then
+    if not data or not bag or data.load_state ~= 'ready' then
         return { state = data and data.load_state == 'loading' and 'loading' or 'unavailable',
             unlocked = {}, catches = {}, weights = {}, total = 0 }
     end
+    ---@type table<string, any>
+    local extra = data.extra
     return { unlocked = shallow_copy(bag.unlocked), catches = shallow_copy(bag.catches),
         weights = shallow_copy(bag.weights), total = bag.total or 0, state = 'ready',
-        completed = data.extra.achievements and data.extra.achievements.final == true }
+        completed = extra.achievements and extra.achievements.final == true }
 end
 
 function Mgr:handle(player, payload)
@@ -40,6 +51,7 @@ function Mgr:handle(player, payload)
     local last = self.last_seq[player.UserId]
     if last and last.player == player and seq <= last.seq then return end
     self.last_seq[player.UserId] = { player = player, seq = seq }
+    ---@type table<string, any>
     local state = self:snapshot(player)
     state.seq = seq
     _G.REUtil:get_re('CompendiumState'):FireClient(player, state)

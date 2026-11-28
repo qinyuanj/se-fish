@@ -22,7 +22,8 @@ end
 ---@param initial_now number|nil
 ---@return { second: table, on_second: table, on_frame: table, now: fun(): number, step: fun(self: table, dt: number, now?: number), advance: fun(self: table, seconds: number) }
 function SpokeClock.new(initial_now)
-  local start_now = initial_now == nil and 0 or initial_now
+  local start_now = initial_now ~= nil and initial_now or 0
+  ---@cast start_now number
   assert_finite_number(start_now, "SpokeClock.new initial_now")
 
   local current_now = start_now

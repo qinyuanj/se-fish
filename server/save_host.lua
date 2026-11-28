@@ -2,6 +2,19 @@ local DeepCopy = require('common.deep_copy')
 local GameCfg = require('common.game_cfg')
 local StoreHandle = require('common.store_handle')
 local PlayerData = require('server.data.player_data')
+---@class SaveHost
+---@field SpokeHost boolean
+---@field ledger table
+---@field pending table
+---@field flying table
+---@field sessions table
+---@field waiters table
+---@field next_autosave_at number?
+---@field player_data any
+---@field QaSlot string?
+---@field slot_pinned boolean?
+---@field store_checked boolean?
+---@field Store any
 local SaveHost = { SpokeHost = true, ledger = {}, pending = {}, flying = {}, sessions = {}, waiters = {}, next_autosave_at = nil }
 local function cfg() return GameCfg.Save end
 -- DataStore 句柄缓存字段与取不到时的说明。字段名沿用既有的 store_checked/Store（save_test 直接复位它们模拟服务缺失）。
@@ -25,6 +38,7 @@ local function validSlot(slot)
 end
 function SaveHost:key(userId)
     if not self.slot_pinned then
+        ---@type string?
         local slot = cfg().QaSlot
         assert(slot == nil or slot == '' or validSlot(slot), 'QA 存档槽须为 1—40 位字母、数字、下划线或连字符')
         self.QaSlot, self.slot_pinned = slot or '', true

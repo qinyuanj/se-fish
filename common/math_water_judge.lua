@@ -82,7 +82,7 @@ function MathWaterJudge.toward(zones, pos)
         local distance = dx * dx + dz * dz
         if not best or distance < best then best, bestX, bestZ = distance, dx, dz end
     end
-    if not best or best < 1e-4 then return nil end
+    if not best or best < 1e-4 or not bestX or not bestZ then return nil end
     local length = math.sqrt(best)
     return bestX / length, bestZ / length
 end

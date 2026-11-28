@@ -1,3 +1,11 @@
+---@class PressGesture
+---@field long_press_sec number
+---@field move_tolerance_px number
+---@field active boolean
+---@field start_t number?
+---@field start_pos { x: number, y: number }?
+---@field long_fired boolean?
+---@field canceled boolean?
 local Gesture = {}
 Gesture.__index = Gesture
 

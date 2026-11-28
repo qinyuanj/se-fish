@@ -128,7 +128,7 @@ function M.release(state, now, reason)
 end
 
 ---@return table { Position?, Snapped?, Released?, Reason? }
-function M.follow(state, targetPos, now, dt)
+function M.follow(state, targetPos, now, _dt)
     if not state.carried then return { Position = nil } end
     local desired = M.mount_point(state.host, state.Offset, state.Yaw)
     state.mount = desired
@@ -144,7 +144,7 @@ function M.follow(state, targetPos, now, dt)
 end
 
 ---@return table { Released, Reason?, drop_point?, Position? }
-function M.step(state, now, dt)
+function M.step(state, now, _dt)
     state.stats.frames = state.stats.frames + 1
     if not state.carried then return { released = false, Position = nil } end
     if num(now) - state.started_at >= state.cfg.MaxCarrySec then

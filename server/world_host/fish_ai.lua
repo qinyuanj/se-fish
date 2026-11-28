@@ -1,5 +1,9 @@
 local AiAPI = require('server.packages.official_ai_feature.api')
 
+---@class FishAiHost
+---@field ai_api table
+---@field AbilityAPI any
+---@field FishUnit any
 local Mgr = { ai_api = AiAPI }
 
 local function leaf(fish)

@@ -95,23 +95,26 @@ function DamageFloat:update()
     end
     local now = game:GetService('World'):GetServerTime()
     for i = #self.active, 1, -1 do
+        ---@type { node: any, start: number, position: any, height: number, spread: number }?
         local entry = self.active[i]
-        local progress = math.max(0, (now - entry.start) / cfg.DurationSec)
-        if progress >= 1 then
-            entry.node.Visible = false
-            entry.node.Opacity = 1
-            table.remove(self.active, i)
-            if #self.pool < cfg.PoolSize then
-                self.pool[#self.pool + 1] = entry.node
+        if entry then
+            local progress = math.max(0.0, (now - entry.start) / cfg.DurationSec)
+            if progress >= 1 then
+                entry.node.Visible = false
+                entry.node.Opacity = 1
+                table.remove(self.active, i)
+                if #self.pool < cfg.PoolSize then
+                    self.pool[#self.pool + 1] = entry.node
+                else
+                    entry.node:Destroy()
+                end
             else
-                entry.node:Destroy()
-            end
-        else
-            local x, y = self:project(entry.position, entry.height)
-            entry.node.Visible = x ~= nil
-            if x then
-                entry.node.Position = Vector2.New(x + entry.spread, y + cfg.RisePixels * progress)
-                entry.node.Opacity = 1 - progress
+                local x, y = self:project(entry.position, entry.height)
+                entry.node.Visible = x ~= nil
+                if x and y then
+                    entry.node.Position = Vector2.New(x + entry.spread, y + cfg.RisePixels * progress)
+                    entry.node.Opacity = 1 - progress
+                end
             end
         end
     end

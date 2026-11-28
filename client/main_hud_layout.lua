@@ -55,7 +55,7 @@ local function bounds(controls, pad)
         l, r = math.min(l or cl, cl), math.max(r or cr, cr)
         b, t = math.min(b or cb, cb), math.max(t or ct, ct)
     end
-    if not l then return nil end
+    if not l or not r or not b or not t then return nil end
     return fromEdges(l - pad, r + pad, b - pad, t + pad)
 end
 
@@ -94,6 +94,7 @@ function MainHudLayout.compute(input)
         zone[spec.name] = r
     end
     local stick = zone.Joystick
+    if not stick then error("missing Joystick reserved zone") end
     local stickZone = rect(stick.x, stick.y, stick.w + 2 * JOYSTICK_ZONE_EXTRA, stick.h + 2 * JOYSTICK_ZONE_EXTRA)
     reserved[#reserved + 1] = { name = 'JoystickZone', rect = stickZone }
     local function left(r) return (edgesOf(r)) end

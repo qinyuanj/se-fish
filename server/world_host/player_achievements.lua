@@ -1,4 +1,12 @@
 local GameCfg=require('common.game_cfg')
+---@class PlayerAchievementsHost
+---@field retry_at table<any, number>
+---@field busy table<any, boolean>
+---@field player_data any
+---@field Save any
+---@field Players any
+---@field World any
+---@field archive any
 local Mgr={retry_at={},busy={}}
 
 local function positiveId(value)

@@ -48,7 +48,7 @@ local ok_now, initial_now = pcall(function() return World:GetServerTime() end) -
 if not ok_now or not Number.is_finite_number(initial_now) then print("[client.main] 启动读取宿主时钟失败", tostring(initial_now)); initial_now = nil end; local client_clock = SpokeClock.new(initial_now)
 local client_store, client_store_writer = ClientStore.new({ clock = client_clock })
 client_store_writer:bind_host()
-_G.local_msg_notice = function(text) client_store_writer:show_notice(text) end
+_G.local_msg_notice = function(text, _duration, _text_color) client_store_writer:show_notice(text) end
 local function send_gm(payload) REUtil:get_re("GMAction"):FireServer(payload) end
 _G.GM = {
     coin = function(amount, target) send_gm({ action = "Coin", amount = amount, target = target }) end,

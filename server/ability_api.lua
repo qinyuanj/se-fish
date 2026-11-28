@@ -53,6 +53,7 @@ function AbilityAPI.attach_to_socket(world, unit, host, socketName, offset, rota
 	if not host then return { Ok = false, Error = 'no-host' } end
 	if type(socketName) ~= 'string' or socketName == '' then return { Ok = false, Error = 'no-socket' } end
 	world = world or game:GetService('World')
+	---@type { x: number, y: number, z: number }
 	local pos = CarryMount.safe_offset(offset or { x = 0, y = 0, z = 0 }, 0, 0).Offset
 	local options = {
 		Name = 'CarryMount_' .. tostring(host.Name or 'host'),

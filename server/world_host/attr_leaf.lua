@@ -63,7 +63,7 @@ function AttrLeaf.project_components(attr_api, character, key, components)
   end
   local cfg_ok, cfg_err = AttrLeaf.validate_config(attr_api, key)
   if not cfg_ok then
-    return false, cfg_err
+    return false, cfg_err or "invalid-attr-config"
   end
   local comp_types = attr_api.Enums and attr_api.Enums.AttrComponentType
   if type(comp_types) ~= "table" then
@@ -180,6 +180,7 @@ function AttrBehavior.project_health(self, character, attrs, summary)
     record_projection_error(self.attr_env, summary, "PlayerMaxHealth", max_hp)
     return
   end
+  ---@cast max_hp number
   summary.values.PlayerMaxHealth = math.max(1, math.min(GameCfg.Ability.BodyScale.HealthMax, max_hp))
 end
 
@@ -203,6 +204,7 @@ function AttrBehavior.project_walk(self, character, attrs, summary)
     return
   end
   env.player_tree.walk_projection_rejected = false
+  ---@cast walk_speed number
   local clamped_speed = Number.is_finite_number(walk_speed) and math.max(0, walk_speed) or 0
   summary.values.PlayerWalkSpeed = clamped_speed
   local ok_spd, spd_err = AttrLeaf.apply_walk_speed(character, clamped_speed)
@@ -219,6 +221,7 @@ function AttrBehavior.project_hunger(self, character, attrs, summary)
     record_projection_error(self.attr_env, summary, "PlayerHunger", hunger)
     return
   end
+  ---@cast hunger number
   summary.values.PlayerHunger = math.max(0, math.min(GameCfg.Vitals.MaxHunger, math.floor(hunger)))
 end
 

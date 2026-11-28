@@ -8,7 +8,10 @@ end
 
 local function itemName(id)
     local achievement = type(id) == 'string' and id:match('^achievement%.(.+)$')
-    if achievement then return GameCfg.Achievements[achievement].Name end
+    if achievement then
+        local ach = GameCfg.Achievements[achievement]
+        return ach and ach.Name or tostring(id)
+    end
     local item = GameCfg.Items.Definitions[id]
     return item and item.Name or tostring(id)
 end

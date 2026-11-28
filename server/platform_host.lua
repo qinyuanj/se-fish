@@ -1,6 +1,11 @@
 local EngineRead = require('common.engine_read')
 local GameCfg = require('common.game_cfg')
 
+---@class PlatformHost
+---@field SpokeHost boolean
+---@field flows table<any, any>
+---@field next_flow_id integer
+---@field shop_action (fun(player: any, payload: table): boolean)?
 local PlatformHost = { SpokeHost = true, flows = {}, next_flow_id = 0 }
 
 local function cfg()
@@ -20,12 +25,9 @@ local function service(name)
     return ok and svc or nil
 end
 
+---@return boolean
 local function debugEnabled()
     return GameCfg.Debug and GameCfg.Debug.Enabled == true
-end
-
-local function configured(row)
-    return type(row) == 'table' and type(row.goodsId) == 'string' and row.goodsId ~= ''
 end
 
 local function placeholderConfigured()
@@ -34,17 +36,14 @@ local function placeholderConfigured()
 end
 
 local function placeholderAllowed()
-    if not placeholderConfigured() then return false end
+    local config = GameCfg.platform_placeholder()
+    if config == nil or config.Enabled ~= true then return false end
     if debugEnabled() then return true end
-    return GameCfg.platform_placeholder().AllowInPublish == true
+    return config.AllowInPublish == true
 end
 
 local function closedReason()
     return placeholderConfigured() and 'not_open' or 'unavailable'
-end
-
-local function closedText(reason)
-    return reason == 'not_open' and cfg().NotOpenText or cfg().UnavailableText
 end
 
 local function coinAmount(offer)
@@ -122,7 +121,7 @@ local function resolve(mgr, player, flow, outcome, payload)
     end
 end
 
-function PlatformHost:can_purchase(player, goodsKey)
+function PlatformHost:can_purchase(_player, goodsKey)
     if type(cfg().Goods[goodsKey]) ~= 'table' then return false, 'invalid' end
     if debugEnabled() then return true end
     if placeholderAllowed() and placeholderGoodsId('goods', goodsKey) then return true end
@@ -186,7 +185,7 @@ function PlatformHost:resolve_placeholder(player, outcome)
     return true
 end
 
-function PlatformHost:on_goods_purchase_completed(goodsId, num, player)
+function PlatformHost:on_goods_purchase_completed(goodsId, _num, _player)
     -- 公开信号无订单身份，旧单/重复单无法与当前 flow 安全关联，保持关闭。
     print('[PlatformHost] 缺可信交付身份，忽略真实购买信号', tostring(goodsId))
 end
@@ -200,7 +199,8 @@ function PlatformHost:handle_test_action(player, payload)
         or (payload.outcome ~= 'success' and payload.outcome ~= 'cancel' and payload.outcome ~= 'fail') then
         return false
     end
-    local flow = player and self.flows[player.UserId]
+    if not player then return false end
+    local flow = self.flows[player.UserId]
     if not flow or flow.player ~= player or flow.placeholder then return false end
     resolve(self, player, flow, payload.outcome, { driver = true })
     return true
@@ -239,7 +239,7 @@ end
 
 function PlatformHost:update()
     local now = self:now()
-    for userId, flow in pairs(self.flows) do
+    for _, flow in pairs(self.flows) do
         if now >= flow.deadline then
             resolve(self, flow.player, flow, 'timeout')
         end

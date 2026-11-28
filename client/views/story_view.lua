@@ -5,7 +5,7 @@ function StoryView.modal_spec(options)
   options = options or {}
   return function(scope, ctx)
     local resolution = ViewUtil.get_resolution(ctx, options); if resolution == nil then return end
-    local width = math.min(1000, resolution.x - 60)
+    local width = math.min(1000.0, resolution.x - 60)
     local panel = ctx.create_node(scope, "EUIImage", {
       Parent = ctx.root_node, Name = "ScreenStory", Position = Vector2.New(resolution.x / 2, resolution.y / 2),
       Size = Vector2.New(width, 360), Image = "official://image/11017", Color = Color.New(22, 38, 54, 250),
@@ -31,13 +31,13 @@ function StoryView.modal_spec(options)
 
     local body = label("DialogueBody", 0, -10, width - 80, 130, 26)
     local payload, page = ctx.store.modal_payload:now() or ctx.store.story:now() or {}, 1
+    ---@type fun()
     local render
     local next_button
     next_button = button("DialogueNext", -160, 260, "下一段", function()
       if type(payload) ~= "table" or type(payload.lines) ~= "table" then return end
       if page < #payload.lines then page = page + 1 render() end
     end)
-    local read_button, read_label
     local function send_read()
       if type(payload) ~= "table" then return end
       local services = ctx.services or {}
@@ -45,7 +45,7 @@ function StoryView.modal_spec(options)
         services.send_story({ action = "read", read_key = payload.read_key or "opening" })
       end
     end
-    read_button, read_label = button("DialogueRead", 160, 300, "已读，开始钓鱼", send_read)
+    local read_button, read_label = button("DialogueRead", 160, 300, "已读，开始钓鱼", send_read)
     render = function()
       if type(payload) ~= "table" then return end
       local lines = type(payload.lines) == "table" and payload.lines or { payload.text or payload.fallbackText or "" }

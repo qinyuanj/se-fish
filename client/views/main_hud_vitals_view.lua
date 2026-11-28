@@ -4,7 +4,6 @@
 
 local Spoke = require("common.packages.spoke.api")
 local GameCfg = require("common.game_cfg")
-local Number = require("common.number")
 local MainHudLayout = require("client.main_hud_layout")
 local ViewUtil = require("client.views.view_util")
 local HudWidgets = require("client.views.hud_widgets")

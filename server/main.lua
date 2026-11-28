@@ -1,7 +1,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local WorldService = game:GetService("World")
-local REUtil = require("common.re_util")
 require("common.util")
 require("common.teleport_util")
 local ZoneMarkers = require("common.zone_markers")
@@ -18,6 +17,7 @@ local FishAi = require("server.world_host.fish_ai")
 local FishAbility = require("server.fish_ability")
 local InteractionPoints = require("server.world_host.interaction_points")
 local AttrLeaf = require("server.world_host.attr_leaf")
+---@type any
 local WorldRuntime
 
 local function serverNow()

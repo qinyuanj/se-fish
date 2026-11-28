@@ -2,10 +2,7 @@ local EngineRead = require("common.engine_read")
 local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local BodyScale = require("common.body_scale")
-local Spoke = require("common.packages.spoke.api")
 local SpokeRuntime = require("common.packages.spoke.runtime.spoke_runtime")
-
-local Effect = Spoke.Effect
 
 local GroundLoot = {}
 

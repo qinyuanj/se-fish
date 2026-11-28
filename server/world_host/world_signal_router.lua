@@ -39,6 +39,7 @@ function WorldSignalRouter.bind_world(scope, signal, owner, fn)
   if not signal then return end
   local slot = bound_world_signals[signal]
   if not slot then
+    ---@type { owner: any, fn: (fun(...))?, connection: any }
     local entry = { owner = nil, fn = nil }
     local connection = signal:Connect(function(...)
       if entry.owner ~= nil and entry.fn ~= nil then

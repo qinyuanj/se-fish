@@ -5,6 +5,15 @@ local SignalRouter = require('server.world_host.world_signal_router')
 local is_finite ---@type fun(value: any): boolean
 local read_now ---@type fun(self: table): number|nil
 local resolve_read_state ---@type fun(self: table, fishId: string, ok: boolean, entry: any, kind: any): table
+---@class WorldRecordsHost
+---@field adapter table
+---@field cache table
+---@field pending table
+---@field reading table
+---@field last_seq table
+---@field last_seq_players table
+---@field stats table
+---@field player_data any
 local Mgr = {
     adapter = Adapter,
     cache = {},
@@ -126,6 +135,7 @@ function Mgr:state(fishId)
     local cached = self.cache[fishId]
     if not cached then return { state = 'unavailable', fishId = fishId, error = 'cold' } end
     if cached.entry then
+        ---@type table<string, any>
         local state = Records.state(cached.entry)
         state.fishId, state.stale = fishId, cached.failed ~= nil
         return state

@@ -3,6 +3,15 @@ local GameCfg = require("common.game_cfg")
 local Number = require("common.number")
 local DamageNotice = require("common.damage_notice")
 
+---@class FishCarrierHost
+---@field RECEIVER_NAME string
+---@field BODY_NAME_PREFIX string
+---@field body_seq integer
+---@field DEFAULT_MAX_HEALTH number
+---@field carriers table<any, any>
+---@field subscribers table<any, any>
+---@field damage_publisher any
+---@field damage_listener (fun(carrier: any, actual: number, hit: any))?
 local Mgr = {}
 
 Mgr.RECEIVER_NAME = "FishHitReceiver"
@@ -283,6 +292,7 @@ function Mgr:spawn(opts)
 	end
 	local position = opts.Position; if type(position) == 'table' and getmetatable(position) == nil then position = Vector3.New(position.x, position.y, position.z) end
 	local cfg = GameCfg.FishCarrier or {}
+	---@type table<string, any>?
 	local species = GameCfg.Fish[opts.fish_id]
 	local tint = species and species.VisualColor
 	Mgr.body_seq = Mgr.body_seq + 1
@@ -387,13 +397,13 @@ end
 function Mgr:start()
 end
 
-function Mgr:on_player_added(player)
+function Mgr:on_player_added(_player)
 end
 
-function Mgr:on_player_removing(player)
+function Mgr:on_player_removing(_player)
 end
 
-function Mgr:update(deltaTime)
+function Mgr:update(_deltaTime)
 	for _, carrier in pairs(self.carriers) do
 		if carrier.skip_next_auto_sync then carrier.skip_next_auto_sync = nil
 		else syncReceiver(carrier) end

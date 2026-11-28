@@ -109,7 +109,7 @@ end
 ---@param cooldownSec number
 ---@return number remaining
 function M.cooldown_remaining(lastCastAt, now, cooldownSec)
-    if isBadNumber(lastCastAt) or isBadNumber(now) then return 0 end
+    if not lastCastAt or isBadNumber(lastCastAt) or isBadNumber(now) then return 0 end
     local remaining = lastCastAt + cooldownSec - now
     if remaining < 0 then return 0 end
     return remaining

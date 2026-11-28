@@ -160,6 +160,7 @@ function FishingBehavior.begin_cast(self, payload)
     self:publish("unavailable")
     return false
   end
+  ---@type boolean, any, any
   local ok, landing, zone = pcall(cast_landing, character)
   if not ok then
     print("[FishingPhase] 计算落点失败", env.player.UserId, tostring(landing))
@@ -216,6 +217,7 @@ function FishingBehavior.hook_now(self)
   if now_of(tree) < session.hookAt then return end
   local boss = session.baitId and GameCfg.Casting.BossBait and GameCfg.Casting.BossBait[session.baitId]
   local forced = GameCfg.Debug and GameCfg.Debug.Enabled and self.next_fish or nil
+  ---@type string?
   local fish_id = forced and forced.fishId or boss
   if not fish_id then
     fish_id = FishCatch.select(
@@ -305,7 +307,7 @@ function FishingBehavior.land_fish(self, current)
     and type(fish_unit.spawn_landed) == "function" then
     local forward = rotation:GetForward()
     local length = forward and math.sqrt(forward.x * forward.x + forward.z * forward.z) or 0
-    local dx, dz = 0, 0
+    local dx, dz = 0.0, 0.0
     if length >= 0.01 then
       dx = GameCfg.Casting.LandingOffset * forward.x / length
       dz = GameCfg.Casting.LandingOffset * forward.z / length
@@ -546,6 +548,7 @@ end
 --- 对外方法名、参数顺序与返回值沿用拆分前的返回表，调用方照旧 handle:method(...)。
 function FishingPhase.mount(scope, tree, opts)
   opts = type(opts) == "table" and opts or {}
+  ---@type table<string, any>
   local handle = {
     line_unit = nil,
     session = nil,

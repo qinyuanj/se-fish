@@ -1,6 +1,8 @@
 local HostSignal = require("common.host_signal")
 local SpokeEggy = require("common.packages.spoke_eggy.api")
 
+---@class EelDischargeModule
+---@field services { Vitals?: any, FishCarrier?: any }
 local M = { services = {} }
 
 function M.discharge(owner, radius, damage, hit)
