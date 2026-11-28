@@ -1,6 +1,6 @@
 # se-fish 功能验证地图（Feature Map）
 
-本目录是《钓鱼怎么这么危险啊喂！》（`se-fish`）面向用户视角的试玩与验收驾驶真源，覆盖**单人可完成（Solo clear）核心循环**与**多人规则（离线多连接代码路径 + 真实双客户端联机）**。驱动前先阅读本索引，再按目标功能进入对应配方。
+本目录是《钓鱼怎么这么危险啊喂！》（`se-fish`）面向用户视角的试玩与验收驾驶真源，覆盖**单人可完成（Solo clear）核心循环**与**多人规则四层测试（L1 离线多连接夹具 / L2 单窗调试插件 AI / L3 本地多人测试多窗口 / L4 共建与真实平台）**。驱动前先阅读本索引，再按目标功能进入对应配方。
 
 > 条款级真源在 [验收矩阵索引](../../../../docs/acceptance/README.md)；本目录负责把高频用户旅程拆解为可执行的驱动步骤、前置条件、观测点与避坑清单，不重复抄写条款全文。
 
@@ -16,10 +16,13 @@
 
 - 优先走玩家真实操作（`editor-cli input`、EUI 按钮、正常业务交互），不把直接改状态或 GM 跳步算作玩家路径通过。
 - 命令参数与日志标记按字面原样执行；客户端 `exec` 内部统一单引号，且绝不修改 `client/main.lua`。
-- 抓屏一律走 `lua tools/cli.lua screenshot`（先跑 `--info` 确认编辑器窗口非最小化），关键状态连拍两张校验帧新。
-- 多人规则严格区分两轨：
-  1. **离线多连接轨（A/B 级）**：`lua tools/cli.lua test spec` 与 `lua tests/probes/local_link_runtime.lua`；
-  2. **真实双端联机轨（C 级）**：必须 `probe_online_players.lua` 返回 `count>=2`，否则该轨记为 `blocked`（[ADR-0040](../../../../docs/adr/0040-local-multiplayer-not-simulatable-in-editor.md)）。
+- 抓屏一律走 `lua tools/cli.lua screenshot`（先跑 `--info` 确认编辑器窗口非最小化），关键状态连拍两张校验帧新；L3 多窗口先 `--list` 拿各窗口 `hwnd`，再用 `--all` 一次抓全部或 `--hwnd <hwnd>` 抓指定窗口。
+- 多人规则按 [ADR-0044](../../../../docs/adr/0044-editor-local-multiplayer-and-ai-playtest.md) 严格分四层，证明口径不混用：
+  1. **L1 离线多连接夹具（A/B 级）**：`lua tools/cli.lua test spec` 与 `lua tests/probes/local_link_runtime.lua`，承担 8～10 连接规模的全自动回归；只证明代码路径，**不冒充 C 级**。
+  2. **L2 单窗调试插件 AI（排障）**：单客户端试玩中 **调试插件 → AI → 添加AI / 切换AI**；AI 的 `Player` 与网络身份语义待 `probe_local_mp_run.lua --mode debug-ai` 首轮钉死，钉死前**不记 C 级**。
+  3. **L3 本地多人测试多窗口（C 级主路径）**：`play start` 只起单客户端，须在编辑器 UI 点 **测试 → 测试页签 → 本地多人测试 → 开始**；`probe_online_players.lua` 返回 `count>=2` 后才算进入本层，否则记为 `blocked`。首轮先跑 `probe_local_mp_run.lua --mode local-mp` 钉死 `--player` 路由。
+  4. **L4 共建多人测试 / 真实平台（发布前签署）**：真实多账号、跨设备网络与 8 人以上真实容量，记入 [生产开关台账](../../../../docs/acceptance/production-switches.md) 第 7、10 项；本地双窗口**不宣称**真实容量通过。
+- 任何一层都**禁止**用业务脚本 `World:CreateUnit` 生成的 `EggyUnit` NPC 冒充玩家。
 - 每次改动状态后在 Cleanup 恢复 `qa-slot` 与停止持续输入，但不删除证据文件。
 
 ## Proof and skip reporting（取证与跳过报告规范）
@@ -28,7 +31,7 @@
 - 试玩 UI 证据包含关键操作前后截图（`lua tools/cli.lua screenshot`）及 `read_image` 复核结论，并配服务端/客户端日志对照。
 - 离线命令证据包含完整命令、关键输出摘要与退出码。
 - 变更持久化类证据必须包含二次只读回读或「停试玩 → 同槽重进」后的状态复核。
-- 前置条件不满足（例如缺少真实第二客户端、编辑器窗口最小化无法抓屏）时，必须如实报告 `blocked` / 未达成的具体前提与已尝试命令，**绝不通过其他入口或降级手段伪报已验证**。
+- 前置条件不满足（例如 L3 本地多人测试未启动导致在线玩家不足、编辑器窗口最小化无法抓屏）时，必须如实报告 `blocked` / 未达成的具体前提与已尝试命令，**绝不通过其他入口或降级手段伪报已验证**。
 
 ## Feature entry contract（功能文件契约）
 
@@ -46,4 +49,4 @@
 | [combat-and-survival.md](combat-and-survival.md) | 武器装备与攻击活鱼、受击进入濒死（15 秒）、死亡免费弱复活（30 秒/60 秒虚弱）与复活入口 | 单人试玩 + A/B 级单测 | [06-combat-and-growth.md](../../../../docs/acceptance/06-combat-and-growth.md)、[11-downed-death-revive.md](../../../../docs/acceptance/11-downed-death-revive.md) |
 | [economy-shop-and-grill.md](economy-shop-and-grill.md) | 钓鱼佬回收鱼获、钓场商店四分页购买/限购、Z3+ 烤炉烤制倍率曲线与烤糊 30 伤害 | 单人试玩 + A/B 级单测 | [07-economy-and-shop.md](../../../../docs/acceptance/07-economy-and-shop.md)、[08-npc-exchange-ferry.md](../../../../docs/acceptance/08-npc-exchange-ferry.md)、[10-grilling.md](../../../../docs/acceptance/10-grilling.md) |
 | [save-and-rejoin.md](save-and-rejoin.md) | QA 存档槽隔离、退出重进恢复个人持久状态、共享世界活鱼/地面物不入个人档与 ADR-0028 四栏覆盖 | 单人试玩 + B 级单测 | [18-save-and-recovery.md](../../../../docs/acceptance/18-save-and-recovery.md) |
-| [multiplayer-squad-pk-rescue.md](multiplayer-squad-pk-rescue.md) | 小队组队（3 人上限/2 米距离/10 秒超时）、同队与鱼塘免伤、野外 PK、他人抢救（10% 恢复）与共享世界竞争 | 离线多连接（A/B）+ 单端骨架 + 真双端联机（C） | [09-multiplayer-rules.md](../../../../docs/acceptance/09-multiplayer-rules.md)、[production-switches.md](../../../../docs/acceptance/production-switches.md) |
+| [multiplayer-squad-pk-rescue.md](multiplayer-squad-pk-rescue.md) | 小队组队（3 人上限/2 米距离/10 秒超时）、同队与鱼塘免伤、野外 PK、他人抢救（10% 恢复）与共享世界竞争 | L1 离线多连接（A/B）+ L2 调试插件 AI（排障）+ L3 本地多人多窗口（C）+ L4 共建/真机（签署） | [09-multiplayer-rules.md](../../../../docs/acceptance/09-multiplayer-rules.md)、[production-switches.md](../../../../docs/acceptance/production-switches.md) |

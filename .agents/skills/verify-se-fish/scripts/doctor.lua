@@ -12,7 +12,8 @@ local function script_repo_root()
   local src = debug.getinfo(1, "S").source
   local path = src:sub(1, 1) == "@" and src:sub(2) or src
   path = path:gsub("\\", "/")
-  local root = path:match("^(.*)/%.dsh/skills/verify%-se%-fish/scripts/doctor%.lua$")
+  local root = path:match("^(.*)/%.agents/skills/verify%-se%-fish/scripts/doctor%.lua$")
+    or path:match("^(.*)/%.dsh/skills/verify%-se%-fish/scripts/doctor%.lua$")
   return root or "."
 end
 
@@ -36,7 +37,12 @@ local function has_value(list, target)
   return false
 end
 
-local ADR0040_CLI_PIN = "0.20.17"
+-- ADR-0044 实证时的 editor-cli 版本：该版本的 play start 仍只起单客户端，
+-- 本地多人测试（多窗口）与调试插件 AI 只能从编辑器 UI 触发。版本变化时提示复核是否开放了自动化参数。
+local ADR0044_CLI_PIN = "0.20.20"
+local MULTIPLAYER_LIVE_NOTE = "ADR-0044: 编辑器 GUI 支持本地多人测试（测试 → 测试页签 → 本地多人测试 → 开始，多独立客户端窗口）"
+  .. "与试玩内调试插件 AI（添加AI / 切换AI）；editor-cli " .. ADR0044_CLI_PIN
+  .. " 的 play start 仍只起单客户端，尚无对应自动化启动参数，多窗口须在编辑器 UI 手动启动一次"
 
 local function parse_args(argv)
   local opts = { json = false, instance = nil }
@@ -161,7 +167,7 @@ local function main()
     lua_version = _VERSION,
     repo_root = seam.normalize(REPO_ROOT),
     busted = { available = false, path = nil },
-    editor_cli = { available = false, path = nil, version = nil, adr0040_pin = ADR0040_CLI_PIN },
+    editor_cli = { available = false, path = nil, version = nil, adr0044_pin = ADR0044_CLI_PIN },
     host_workspace = { path = nil, error = nil },
     qa_slot = { slot = nil, is_production = false, error = nil },
     editor = { state = "unknown", running = false, map_name = nil, map_id = nil, editor_mode = nil, play_session = nil, instances_count = 0 },
@@ -172,7 +178,7 @@ local function main()
       offline_spec_ready = false,
       solo_playtest_ready = false,
       multiplayer_offline_ready = false,
-      multiplayer_live_note = "ADR-0040: 编辑器 1.0.37 / editor-cli 0.20.17 无本地模拟多人入口，真双端试玩需外部第二真实客户端加入同一房间",
+      multiplayer_live_note = MULTIPLAYER_LIVE_NOTE,
     },
     blockers = blockers,
     warnings = warnings,
@@ -215,8 +221,8 @@ local function main()
     local _, ver_out = seam.capture({ argv = { cli, "--version" }, cwd = REPO_ROOT })
     local ver = ver_out and ver_out:match("(%d+%.%d+%.%d+)") or nil
     report.editor_cli.version = ver
-    if ver and ver ~= ADR0040_CLI_PIN then
-      warnings[#warnings + 1] = "editor-cli 版本已变更（当前 " .. ver .. " vs ADR-0040 钉子 " .. ADR0040_CLI_PIN .. "），请复核是否新增本地多人入口"
+    if ver and ver ~= ADR0044_CLI_PIN then
+      warnings[#warnings + 1] = "editor-cli 版本已变更（当前 " .. ver .. " vs ADR-0044 钉子 " .. ADR0044_CLI_PIN .. "），请复核 play start --help 是否开放了本地多人测试 / 调试插件 AI 的自动化启动参数"
     end
 
     -- instances
@@ -301,7 +307,7 @@ local function main()
       "=== verify-se-fish doctor ===",
       "结果       : " .. (ok_exit and "READY（可驱动）" or "BLOCKED（存在阻塞项）"),
       "Lua / 离线 : " .. report.lua_version .. " | busted=" .. tostring(report.busted.available),
-      "editor-cli : " .. tostring(report.editor_cli.version or "缺失") .. " (ADR-0040 钉子=" .. ADR0040_CLI_PIN .. ")",
+      "editor-cli : " .. tostring(report.editor_cli.version or "缺失") .. " (ADR-0044 钉子=" .. ADR0044_CLI_PIN .. ")",
       "宿主目录   : " .. tostring(report.host_workspace.path or "未定位"),
       "QA 存档槽  : " .. (report.qa_slot.slot == "" and "<空 / 正式存档>" or tostring(report.qa_slot.slot)),
       "编辑器状态 : " .. report.editor.state

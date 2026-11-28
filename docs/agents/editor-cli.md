@@ -24,5 +24,5 @@
 - **无插件时没有断点调试**：默认不装、不用 VS Code Eggitor 插件（[ADR-0042](../adr/0042-no-plugin-dev-data-export-only-exception.md)），调试面只有 `log grep` / 控制台日志、`exec` 现场探针、`lua tools/cli.lua screenshot` 三类；没有断点、单步与变量面板，要看中间值就打印唯一标记再 `log grep`。
 - **sync 回灌的引擎生成物**：`sync` 会把 `EggyAPI.lua` 这样的引擎生成物一并带回仓库；与本次改动无关时单独 `git restore`，并在验收记录里点名，别让无关的 API 刷新混进功能分支。
 - **`code push --delete` 逐条超时**：地图侧多出本地已删的脚本时，`code push --delete --yes` 常常只删掉一条就报 `EDITOR_UNREACHABLE: script_delete failed: Timeout waiting for response to script_delete`（`applied before failure: none`），但那条删除其实已经生效。复核用 `code diff` 的 `only-on-map`，它每轮减一；重复执行直到 0 即可（2026-11-24 清理改名遗留的 8 条实测，`--timeout 60` 不改变表现）。
-- **本地模拟多人不可用**：截至编辑器 1.0.37 / editor-cli 0.20.17，没有「单次试玩加入多个虚拟玩家、生成真实 `Player`」的入口；NPC（`World:CreateUnit` 的 `EggyUnit`）不能替代真实玩家，多人验收必须真实第二客户端。结论与未验证项见 [ADR-0040](../adr/0040-local-multiplayer-not-simulatable-in-editor.md)。
+- **本地多人试玩入口在编辑器 UI，CLI 暂未暴露（ADR-0044）**：SE 编辑器顶部 **测试** 下拉菜单的 **测试** 页签支持 **本地多人测试**（可选客户端数量，运行后开启多个独立客户端窗口）与 **共建多人测试**；试玩内 **调试插件 → AI** 支持 **添加AI** 与 **切换AI** 操控多人。截至 `editor-cli 0.20.20`，CLI 的 `play start` 与 `Editor.RunGame` 仍仅覆盖单客户端启动，尚未提供上述两项的自动化触发参数；多窗口下 `--player` 路由与 AI 的 `Players` 语义见 [ADR-0044](../adr/0044-editor-local-multiplayer-and-ai-playtest.md) 待测清单。
 - **宿主 `log.txt` 清理**：`lua tools/cli.lua deploy` 日常检查宿主目录根的 `log.txt`，超过 `512 KB` 或距上次修改超过 `4h` 时直接删除，未达阈值不触碰，文件被编辑器占用时打印提示并跳过。
